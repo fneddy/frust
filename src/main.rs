@@ -3,41 +3,41 @@ use frust::*;
 fn main() {
     let mut ctx = Context::new_stdio();
     ctx.dictionary
-        .add_code(":", Code::Native(builtins::compile));
-    ctx.dictionary.add_code("+", Code::Native(builtins::plus));
-    ctx.dictionary.add_code("-", Code::Native(builtins::minus));
-    ctx.dictionary.add_code("*", Code::Native(builtins::times));
-    ctx.dictionary.add_code("/", Code::Native(builtins::div));
+        .add(":", Code::Native(builtins::compile));
+    ctx.dictionary.add("+", Code::Native(builtins::plus));
+    ctx.dictionary.add("-", Code::Native(builtins::minus));
+    ctx.dictionary.add("*", Code::Native(builtins::times));
+    ctx.dictionary.add("/", Code::Native(builtins::div));
     ctx.dictionary
-        .add_code("mod", Code::Native(builtins::modulo));
+        .add("mod", Code::Native(builtins::modulo));
     ctx.dictionary
-        .add_code("\\", Code::Native(builtins::lcomment));
+        .add("\\", Code::Native(builtins::lcomment));
     ctx.dictionary
-        .add_code("(", Code::Native(builtins::icomment));
-    ctx.dictionary.add_code(".", Code::Native(builtins::dot));
-    ctx.dictionary.add_code("dup", Code::Native(builtins::dup));
-    ctx.dictionary.add_code(".s", Code::Native(builtins::dot_s));
-    ctx.dictionary.add_code("abs", Code::Native(builtins::abs));
-    ctx.dictionary.add_code("=", Code::Native(builtins::eq));
-    ctx.dictionary.add_code("max", Code::Native(builtins::max));
-    ctx.dictionary.add_code("min", Code::Native(builtins::min));
-    ctx.dictionary.add_code("nip", Code::Native(builtins::nip));
+        .add("(", Code::Native(builtins::icomment));
+    ctx.dictionary.add(".", Code::Native(builtins::dot));
+    ctx.dictionary.add("dup", Code::Native(builtins::dup));
+    ctx.dictionary.add(".s", Code::Native(builtins::dot_s));
+    ctx.dictionary.add("abs", Code::Native(builtins::abs));
+    ctx.dictionary.add("=", Code::Native(builtins::eq));
+    ctx.dictionary.add("max", Code::Native(builtins::max));
+    ctx.dictionary.add("min", Code::Native(builtins::min));
+    ctx.dictionary.add("nip", Code::Native(builtins::nip));
     ctx.dictionary
-        .add_code("roll", Code::Native(builtins::unimplemented));
+        .add("roll", Code::Native(builtins::unimplemented));
     ctx.dictionary
-        .add_code("pick", Code::Native(builtins::unimplemented));
+        .add("pick", Code::Native(builtins::unimplemented));
     ctx.dictionary
-        .add_code("over", Code::Native(builtins::over));
+        .add("over", Code::Native(builtins::over));
     ctx.dictionary
-        .add_code("tuck", Code::Native(builtins::tuck));
+        .add("tuck", Code::Native(builtins::tuck));
     ctx.dictionary
-        .add_code("negate", Code::Native(builtins::negate));
-    ctx.dictionary.add_code("dup", Code::Native(builtins::dup));
+        .add("negate", Code::Native(builtins::negate));
+    ctx.dictionary.add("dup", Code::Native(builtins::dup));
     ctx.dictionary
-        .add_code("swap", Code::Native(builtins::swap));
-    ctx.dictionary.add_code("rot", Code::Native(builtins::rot));
+        .add("swap", Code::Native(builtins::swap));
+    ctx.dictionary.add("rot", Code::Native(builtins::rot));
     ctx.dictionary
-        .add_code("drop", Code::Native(builtins::drop));
+        .add("drop", Code::Native(builtins::drop));
     loop {
         let mut buffer = String::new();
         match (ctx.read)(&mut buffer) {

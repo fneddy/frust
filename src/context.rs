@@ -74,8 +74,8 @@ impl Context {
     /// ```
     /// # use frust::*;
     /// # let mut ctx = Context::new_null();
-    /// # ctx.dictionary.add_code("+", Code::Native(builtins::plus));
-    /// # ctx.dictionary.add_code(".", Code::Native(builtins::dot));
+    /// # ctx.dictionary.add("+", Code::Native(builtins::plus));
+    /// # ctx.dictionary.add(".", Code::Native(builtins::dot));
     /// ctx.eval("5 4 + . ");
     /// ```
     pub fn eval(&mut self, input: &str) -> Result<()> {
@@ -86,10 +86,13 @@ impl Context {
             if let Some(token) = tokens.pop_front() {
                 // is this token a word from the dictionary
                 if let Some(word) = self.dictionary.get(token) {
-                    let _ = match word.value.code {
-                        crate::Code::Native(function) => {
+                    let _ = match word.code {
+                        // static word pointing to rust code
+                        Some(crate::Code::Native(function)) => {
                             let _ = function(self, &mut tokens)?;
                         }
+                        // dynamic word pointing to runtime compiled code
+                        Some(crate::Code::Dynamic(_)) => {}
                         _ => return Err(Error::Parser),
                     };
 

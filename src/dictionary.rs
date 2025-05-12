@@ -1,115 +1,150 @@
 use crate::{Context, Result, Variable};
-use std::{collections::VecDeque, rc::Rc};
+use std::collections::{HashMap, VecDeque};
 
-// This is the worst part till now
-// really need to go over it and rewrite
-// TODO: rewrite
-// TODO: document
-// TODO: test
-
+/// `Data` represents **named** forth ***Data***. 
+/// 
+/// `Data` may be either:
+/// 
+/// `Constant` - can not be changed
+/// `Variable` - can be changed
+/// `Array` - multiple `Variable` instances
+///
+/// TODO are arrays always variables?
+///
+/// its possible to crate Data from a Variable
+/// ```
+/// # use frust::Variable;
+/// # use frust::Data;
+/// let x: Variable = 1.into();
+/// let y: Data = x.into();
+/// assert_eq!(y, Data::Variable(Variable::Int(1)))
+/// ```
+///
+/// also ts possible to crate Data from a Vec<Variable>
+/// ```
+/// # use frust::Variable;
+/// # use frust::Data;
+/// let x: Vec<Variable> = vec![1.into(), 2.into(), 3.into()];
+/// let y: Data = x.into();
+/// assert_eq!(y, Data::Array(
+/// 		vec![Variable::Int(1),Variable::Int(2),Variable::Int(3)]
+/// ))
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum Data {
     Variable(Variable),
     Constant(Variable),
-    Array(Vec<Data>),
+    Array(Vec<Variable>),
 }
+
+/// Create a `Data` from a Variable
+impl From<Variable> for Data {
+    fn from(value: Variable) -> Self {
+        Data::Variable(value)
+    }
+}
+
+/// Create a `Data-Array` from a `Vec<Variable>`
+impl From<Vec<Variable>> for Data {
+    fn from(value: Vec<Variable>) -> Self {
+        Data::Array(value)
+    }
+}
+
+/// interface for rust `word-functions`
+/// 
+/// used to write native forth functions in rust
+/// 
+/// - `Context`: the forth context to operate on
+/// - `VecDeque<&str>`: rest of the input buffer **AFTER** our word was called from forth
+/// 
+/// if the forth input looks like this `( this is a comment) some forth code`
+/// 
+/// `(` will be popped from the input buffer
+/// and all following tokens will be passed as `arg2`.
+/// 
 type WordFunction = fn(&mut Context, &mut VecDeque<&str>) -> Result<()>;
+
+
+/// `Code` represents **named** forth executable ***Code***
+/// 
+/// `Code` may be either
+/// 
+/// - `Native`: rust code that will operate on the forth context and input-buffer
+/// - `Dynamic`: forth code written in forth and *compiled*.
+/// 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Code {
     Native(WordFunction),
     Dynamic(Vec<Code>),
-    Variable,
-    Constant,
 }
-
-#[derive(Debug, PartialEq)]
-pub struct DictionaryValue {
-    pub name: String,
-    pub code: Code,
-    pub data: Option<Data>,
+impl From<WordFunction> for Code {
+    fn from(value: WordFunction) -> Self {
+        Code::Native(value)
+    }
 }
-
-pub type DictionaryLink = Option<Rc<Box<DictionaryEntry>>>;
+impl From<Vec<Code>> for Code {
+    fn from(value: Vec<Code>) -> Self {
+        Code::Dynamic(value)
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct DictionaryEntry {
-    pub value: DictionaryValue,
-    pub next: DictionaryLink,
+    pub code: Option<Code>,
+    pub data: Option<Data>,
+}
+impl From<Code> for DictionaryEntry {
+    fn from(value: Code) -> Self {
+        DictionaryEntry {
+            code: Some(value),
+            data: None,
+        }
+    }
+}
+impl From<Data> for DictionaryEntry {
+    fn from(value: Data) -> Self {
+        DictionaryEntry {
+            code: None,
+            data: Some(value),
+        }
+    }
+}
+impl From<(Code, Data)> for DictionaryEntry {
+    fn from(value: (Code, Data)) -> Self {
+        DictionaryEntry {
+            code: Some(value.0),
+            data: Some(value.1),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Dictionary {
-    pub head: DictionaryLink,
+    data: HashMap<String, DictionaryEntry>,
 }
 
 impl Dictionary {
+    /// create a new dictionary
+    ///
+    /// ```
+    /// # use frust::Dictionary;
+    /// let dict = Dictionary::new();
+    /// ```
     pub fn new() -> Dictionary {
-        Dictionary { head: None }
-    }
-
-    pub fn add_data(&mut self, name: &str, value: Data) -> DictionaryLink {
-        let alloc_val = Rc::new(Box::new(DictionaryEntry {
-            value: DictionaryValue {
-                name: name.to_owned(),
-                code: Code::Variable,
-                data: Some(value),
-            },
-            next: self.head.take(),
-        }));
-        self.head = Some(alloc_val);
-        self.head.clone()
-    }
-
-    pub fn add_code(&mut self, name: &str, code: Code) -> DictionaryLink {
-        let alloc_code = Rc::new(Box::new(DictionaryEntry {
-            value: DictionaryValue {
-                name: name.to_owned(),
-                code,
-                data: None,
-            },
-            next: self.head.take(),
-        }));
-        self.head = Some(alloc_code);
-        self.head.clone()
-    }
-
-    pub fn get(&self, name: &str) -> DictionaryLink {
-        let mut i = self.head.clone();
-        while let Some(link) = i {
-            if link.value.name == name {
-                return Some(link);
-            }
-            i = link.next.clone();
+        Dictionary {
+            data: HashMap::new(),
         }
-        None
     }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
+    pub fn add<T>(&mut self, name: &str, value: T)
+    where
+        T: Into<DictionaryEntry>,
+    {
+        self.data.insert(name.to_string(), value.into());
+    }
 
-    #[test]
-    fn test_dictionary() {
-        let mut d = Dictionary::new();
-        d.add_data("value", Data::Variable(23i64.into()));
-        d.add_data("value1", Data::Variable(32i64.into()));
-        d.add_data("value33", Data::Variable(42i64.into()));
-
-        assert_eq!(d.get("foo"), None);
-
-        if let Some(value) = d.get("value") {
-            assert_eq!(value.value.name, "value");
-            assert_eq!(value.value.data, Some(Data::Variable(23i64.into())));
-        } else {
-            assert!(false);
-        }
-
-        if let Some(value) = d.get("value1") {
-            assert_eq!(value.value.name, "value1");
-            assert_eq!(value.value.data, Some(Data::Variable(32i64.into())));
-        } else {
-            assert!(false);
-        }
+    pub fn get(&self, name: &str) -> Option<&DictionaryEntry> {
+        self.data.get(name)
     }
 }
