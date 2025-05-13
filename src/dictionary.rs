@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 /// `Data` may be either:
 /// 
 /// `Constant` - can not be changed
-/// `Variable` - can be changed
+/// `Var` - can be changed
 /// `Array` - multiple `Variable` instances
 ///
 /// TODO are arrays always variables?
@@ -17,7 +17,7 @@ use std::collections::{HashMap, VecDeque};
 /// # use frust::Data;
 /// let x: Variable = 1.into();
 /// let y: Data = x.into();
-/// assert_eq!(y, Data::Variable(Variable::Int(1)))
+/// assert_eq!(y, Data::Var(Variable::Int(1)))
 /// ```
 ///
 /// also ts possible to crate Data from a Vec<Variable>
@@ -32,7 +32,7 @@ use std::collections::{HashMap, VecDeque};
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum Data {
-    Variable(Variable),
+    Var(Variable),
     Constant(Variable),
     Array(Vec<Variable>),
 }
@@ -40,7 +40,7 @@ pub enum Data {
 /// Create a `Data` from a Variable
 impl From<Variable> for Data {
     fn from(value: Variable) -> Self {
-        Data::Variable(value)
+        Data::Var(value)
     }
 }
 
@@ -65,7 +65,6 @@ impl From<Vec<Variable>> for Data {
 /// 
 type WordFunction = fn(&mut Context, &mut VecDeque<&str>) -> Result<()>;
 
-
 /// `Code` represents **named** forth executable ***Code***
 /// 
 /// `Code` may be either
@@ -89,6 +88,7 @@ impl From<Vec<Code>> for Code {
     }
 }
 
+///
 #[derive(Debug, PartialEq)]
 pub struct DictionaryEntry {
     pub code: Option<Code>,
@@ -119,6 +119,29 @@ impl From<(Code, Data)> for DictionaryEntry {
     }
 }
 
+//                                                             
+//                      ┌────────────┐                         
+//                      │ Dictionary │                         
+//                      │   ┌─────┐  │                         
+//                      │   │ Name│  │                         
+//                      └───└──┬──┘──┘                         
+//                             │                               
+//                             ▼                               
+//                     ┌───────────────┐                       
+//                     │DictionaryEntry│                       
+//                     │               │                       
+//                     │code<Code>─────┼──┐                    
+//   ┌─────────────────┤data<Data>     │  │                    
+//   │                 └───────────────┘  │                    
+//   ▼                                    ▼                    
+// ┌────────────────────┐              ┌────────────────────┐  
+// │Data                │              │Code                │  
+// │                    │              │                    │  
+// │Var<Variable>       │              │Native<WordFunction>│  
+// │Const<Variable>     │              │Dynamic<Vec<Code>>  │  
+// │Array<Vec<Variable>>│              └────────────────────┘  
+// └────────────────────┘                                      
+//                                                             
 #[derive(Debug, PartialEq)]
 pub struct Dictionary {
     data: HashMap<String, DictionaryEntry>,
