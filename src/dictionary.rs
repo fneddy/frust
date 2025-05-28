@@ -75,21 +75,21 @@ type WordFunction = fn(&mut Context, &mut VecDeque<&str>) -> Result<()>;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Code {
     Native(WordFunction),
-    Dynamic(Vec<Code>),
+    Dynamic(Vec<DictionaryEntry>),
 }
 impl From<WordFunction> for Code {
     fn from(value: WordFunction) -> Self {
         Code::Native(value)
     }
 }
-impl From<Vec<Code>> for Code {
-    fn from(value: Vec<Code>) -> Self {
+impl From<Vec<DictionaryEntry>> for Code {
+    fn from(value: Vec<DictionaryEntry>) -> Self {
         Code::Dynamic(value)
     }
 }
 
 ///
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DictionaryEntry {
     pub code: Option<Code>,
     pub data: Option<Data>,
@@ -138,7 +138,7 @@ impl From<(Code, Data)> for DictionaryEntry {
 // │Data                │              │Code                │  
 // │                    │              │                    │  
 // │Var<Variable>       │              │Native<WordFunction>│  
-// │Const<Variable>     │              │Dynamic<Vec<Code>>  │  
+// │Const<Variable>     │              │Dynamic<Vec<DictionaryEntry>>  │  
 // │Array<Vec<Variable>>│              └────────────────────┘  
 // └────────────────────┘                                      
 //                                                             
@@ -168,6 +168,6 @@ impl Dictionary {
     }
 
     pub fn get(&self, name: &str) -> Option<&DictionaryEntry> {
-        self.data.get(name)
+        self.data.get(&name.to_lowercase())
     }
 }

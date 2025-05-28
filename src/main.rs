@@ -2,8 +2,6 @@ use frust::*;
 
 fn main() {
     let mut ctx = Context::new_stdio();
-    ctx.dictionary
-        .add(":", Code::Native(builtins::compile));
     ctx.dictionary.add("+", Code::Native(builtins::plus));
     ctx.dictionary.add("-", Code::Native(builtins::minus));
     ctx.dictionary.add("*", Code::Native(builtins::times));
@@ -38,6 +36,8 @@ fn main() {
     ctx.dictionary.add("rot", Code::Native(builtins::rot));
     ctx.dictionary
         .add("drop", Code::Native(builtins::drop));
+    ctx.dictionary
+        .add("?dup", Code::Native(builtins::qdup));
     loop {
         let mut buffer = String::new();
         match (ctx.read)(&mut buffer) {

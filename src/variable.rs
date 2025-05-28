@@ -20,6 +20,11 @@ impl From<Cow<'_, str>> for Variable {
         Variable::String(value.into_owned())
     }
 }
+impl From<&Variable> for Variable {
+    fn from(value: &Variable) -> Self {
+        value.clone()
+    }
+}
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

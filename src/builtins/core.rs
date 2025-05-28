@@ -616,8 +616,16 @@ pub fn cr(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
     Ok(())
 }
 
-
-pub fn compile(_ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
-    
-    Err(Error::Parser)
+/// forth `?dup` command
+/// 
+/// https://forth-standard.org/standard/core/qDUP
+/// 
+/// 
+pub fn qdup(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+    if let Ok(v) = ctx.value_stack.at(0) {
+        if *v != Variable::Int(0)  {
+            ctx.value_stack.push(v.clone());
+        }
+    }
+    Ok(())
 }

@@ -1,11 +1,14 @@
-use crate::{builtins::unimplemented, Dictionary, Error, Result, Stack, Variable};
+use crate::{
+    builtins::unimplemented, Code, Data, Dictionary, DictionaryEntry, Error, Result, Stack,
+    Variable,
+};
 use std::{collections::VecDeque, io::BufRead};
 
 #[derive(Debug, Default)]
 enum State {
     #[default]
     Interpret,
-    Compile(String),
+    Compile(String, Vec<DictionaryEntry>),
 }
 
 /// Complete context of the forth env
@@ -84,9 +87,27 @@ impl Context {
     /// # use frust::Context;
     /// let input = " This is an example for some_forth input";
     /// let tokens = Context::tokenize(input);
+    /// assert_eq!("This", tokens.pop_front());
     /// ```
     fn tokenize(input: &str) -> VecDeque<&str> {
         input.split_whitespace().collect()
+    }
+
+    /// executes an entry from the dictionary
+    fn execute(&mut self, function:DictionaryEntry, tokens: &mut VecDeque<&str> ) -> Result<()>{
+        match (&function.code, &function.data) {
+            (Some(Code::Native(function)), None) => {
+                let _ = function(self, tokens)?;
+                Ok(())
+            }
+            (Some(Code::Dynamic(function)), None) => {
+                Ok(for step in function {
+                    return self.execute(step.clone(),tokens);
+                })
+            }
+            (None,Some(Data::Var(value))) => {Ok(self.value_stack.push(value))}
+            _ => Err(Error::Executor),
+        }
     }
 
     /// interpret forth tokens
@@ -98,23 +119,16 @@ impl Context {
             // and hand over input tokens to compiler
             if token == ":" {
                 if let Some(name) = tokens.pop_front() {
-                    self.state = State::Compile(name.into());
+                    self.state = State::Compile(name.into(), vec![]);
                     return self.compile(tokens);
                 } else {
                     // compilation needs a function name
                     return Err(Error::Parser);
                 }
-            // is this token a word from the dictionary
+            
+            // is this token a word from the dictionary we execute it
             } else if let Some(word) = self.dictionary.get(token) {
-                let _ = match word.code {
-                    // static word pointing to rust code
-                    Some(crate::Code::Native(function)) => {
-                        let _ = function(self, tokens)?;
-                    }
-                    // dynamic word pointing to runtime compiled code
-                    Some(crate::Code::Dynamic(_)) => {}
-                    _ => return Err(Error::Parser),
-                };
+                self.execute(word.clone(), tokens)?
 
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
@@ -133,13 +147,33 @@ impl Context {
     }
 
     fn compile(&mut self, tokens: &mut VecDeque<&str>) -> Result<()> {
-        while let Some(token) = tokens.pop_front() {
-            // ; indicates end of compilation
-            // we switch over to interpreter mode
-            // and hand over the rest of the input
-            if token == ";" {
-                self.state = State::Interpret;
-                return self.interpret(tokens);
+        if let State::Compile(name, function) = &mut self.state {
+            while let Some(token) = tokens.pop_front() {
+                // ; indicates end of compilation
+                // we switch over to interpreter mode
+                // and hand over the rest of the input
+                if token == ";" {
+                    self.dictionary.add(name, Code::from(function.clone()));
+                    self.state = State::Interpret;
+                    return self.interpret(tokens);
+
+                // if this is a valid word from our dictionary we add this to the function to be callable later
+                // note: we clone the complete function in case it gets overwritten we still use the old function.
+                // note: this means you cannot recuse a forth word!
+                } else if let Some(word) = self.dictionary.get(token) {
+                    function.push(word.clone());
+
+                // try to parse the input as a numeric value
+                // this is not std conform we should read `BASE` variable that indicates
+                // the radix (2-10-16)
+                } else if let Ok(value) = std::primitive::i64::from_str_radix(token, 10) {
+                    function.push(Data::Var(Variable::Int(value)).into());
+
+                // we don't know how to handle this token
+                } else {
+                    (self.write)(&format!("{} not valid", token));
+                    return Err(Error::Parser);
+                }
             }
         }
         Err(Error::Unimplemented)
@@ -157,7 +191,7 @@ impl Context {
     pub fn eval(&mut self, input: &str) -> Result<()> {
         match self.state {
             State::Interpret => self.interpret(&mut Self::tokenize(input)),
-            State::Compile(_) => self.compile(&mut Self::tokenize(input)),
+            State::Compile(_, _) => self.compile(&mut Self::tokenize(input)),
         }
     }
 }
