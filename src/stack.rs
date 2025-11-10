@@ -42,7 +42,7 @@ impl Stack {
         self.val.len()
     }
 
-    pub fn iter(&self) -> StackIterator {
+    pub fn iter(&'_ self) -> StackIterator<'_> {
         StackIterator {
             stack: self,
             index: 0,

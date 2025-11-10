@@ -6,6 +6,7 @@ use std::fmt::Display;
 /// TODO: test
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    Compiler,
     Executor,
     Parser,
     Stack,

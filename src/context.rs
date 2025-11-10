@@ -1,14 +1,25 @@
-use crate::{
-    builtins::unimplemented, Code, Data, Dictionary, DictionaryEntry, Error, Result, Stack,
-    Variable,
-};
-use std::{collections::VecDeque, io::BufRead};
+use crate::{Code, Data, Dictionary, DictionaryEntry, Error, Result, Stack, Variable};
+use std::{collections::VecDeque, io::BufRead, mem};
 
 #[derive(Debug, Default)]
-enum State {
+pub enum State {
     #[default]
+    Taken,
     Interpret,
-    Compile(String, Vec<DictionaryEntry>),
+    FIllBuffer(VecDeque<String>),
+    Compile(VecDeque<String>),
+    Error(Error),
+}
+impl State {
+    pub fn is_idling(&self) -> bool {
+        match &self {
+            State::Taken => true,
+            State::Interpret => true,
+            State::FIllBuffer(_) => true,
+            State::Compile(_) => false,
+            State::Error(_) => false,
+        }
+    }
 }
 
 /// Complete context of the forth env
@@ -19,7 +30,7 @@ pub struct Context {
     pub dictionary: Dictionary,
     pub write: fn(&str),
     pub read: fn(&mut String) -> std::io::Result<usize>,
-    state: State,
+    pub state: State,
 }
 
 impl Context {
@@ -89,94 +100,117 @@ impl Context {
     /// let tokens = Context::tokenize(input);
     /// assert_eq!("This", tokens.pop_front());
     /// ```
-    fn tokenize(input: &str) -> VecDeque<&str> {
-        input.split_whitespace().collect()
+    fn tokenize(input: &str) -> VecDeque<String> {
+        input.split_whitespace().map(|token| token.to_owned()).collect()
     }
 
     /// executes an entry from the dictionary
-    fn execute(&mut self, function:DictionaryEntry, tokens: &mut VecDeque<&str> ) -> Result<()>{
+    fn execute(&mut self, function: DictionaryEntry, tokens: &mut VecDeque<String>) -> Result<()> {
         match (&function.code, &function.data) {
-            (Some(Code::Native(function)), None) => {
+            (Some(Code::Call(function)), None) => {
                 let _ = function(self, tokens)?;
                 Ok(())
             }
-            (Some(Code::Dynamic(function)), None) => {
-                Ok(for step in function {
-                    return self.execute(step.clone(),tokens);
-                })
+            (Some(Code::Routine(function)), None) => {for step in function {
+                self.execute(step.clone(), tokens)?
             }
-            (None,Some(Data::Var(value))) => {Ok(self.value_stack.push(value))}
+            Ok(())
+            },
+            (None, Some(Data::Var(value))) => Ok(self.value_stack.push(value)),
             _ => Err(Error::Executor),
         }
     }
 
     /// interpret forth tokens
-    /// if this encounter a : it will switch to compilation mode
-    fn interpret(&mut self, tokens: &mut VecDeque<&str>) -> Result<()> {
-        while let Some(token) = tokens.pop_front() {
-            // : indicates start of compilation mode
-            // we switch internal state to compilation
-            // and hand over input tokens to compiler
-            if token == ":" {
-                if let Some(name) = tokens.pop_front() {
-                    self.state = State::Compile(name.into(), vec![]);
-                    return self.compile(tokens);
-                } else {
-                    // compilation needs a function name
-                    return Err(Error::Parser);
-                }
+    fn state_interpret(&mut self, tokens: &mut VecDeque<String>) -> State {
+
+        // : indicates start of compilation.
+        // we switch to input buffering until we see ;
+        // so we can compile the complete function in one go
+        if tokens.front() == Some(&":".to_owned()) {
+            return self.state_fill_buffer(VecDeque::new(), tokens);
+        }
+
+        // interprete all input token by token
+        while let Some(token) = tokens.pop_front() {   
             
             // is this token a word from the dictionary we execute it
-            } else if let Some(word) = self.dictionary.get(token) {
-                self.execute(word.clone(), tokens)?
+            if let Some(word) = self.dictionary.get(&token) {
+                if let Err(error) = self.execute(word, tokens) {
+                    return State::Error(error)
+                }
+            }
 
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
             // the radix (2-10-16)
-            } else if let Ok(value) = std::primitive::i64::from_str_radix(token, 10) {
+            else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
                 self.value_stack.push(Variable::Int(value));
-
+            }
+            
             // we don't know how to handle this token
-            } else {
+            else {
                 (self.write)(&format!("{} not valid", token));
-                return Err(Error::Parser);
+                return State::Error(Error::Parser);
             }
         }
 
-        Ok(())
+        State::Interpret
     }
 
-    fn compile(&mut self, tokens: &mut VecDeque<&str>) -> Result<()> {
-        if let State::Compile(name, function) = &mut self.state {
-            while let Some(token) = tokens.pop_front() {
-                // ; indicates end of compilation
-                // we switch over to interpreter mode
-                // and hand over the rest of the input
-                if token == ";" {
-                    self.dictionary.add(name, Code::from(function.clone()));
-                    self.state = State::Interpret;
-                    return self.interpret(tokens);
+    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Vec<DictionaryEntry> {
+        let mut function: Vec<DictionaryEntry> = Vec::new();
+        while let Some(token) = tokens.pop_front() {
+            // if this is a valid word from our dictionary we add this to the function to be callable later
+            // note: we clone the complete function in case it gets overwritten we still use the old function.
+            // note: this means you cannot recuse a forth word!
+            if let Some(word) = self.dictionary.get(&token) {
+                let _ = self.execute(word.clone(), tokens);
+                function.push(word);
+            }
 
-                // if this is a valid word from our dictionary we add this to the function to be callable later
-                // note: we clone the complete function in case it gets overwritten we still use the old function.
-                // note: this means you cannot recuse a forth word!
-                } else if let Some(word) = self.dictionary.get(token) {
-                    function.push(word.clone());
-
-                // try to parse the input as a numeric value
-                // this is not std conform we should read `BASE` variable that indicates
-                // the radix (2-10-16)
-                } else if let Ok(value) = std::primitive::i64::from_str_radix(token, 10) {
-                    function.push(Data::Var(Variable::Int(value)).into());
-
-                // we don't know how to handle this token
-                } else {
-                    (self.write)(&format!("{} not valid", token));
-                    return Err(Error::Parser);
-                }
+            // try to parse the input as a numeric value
+            // this is not std conform we should read `BASE` variable that indicates
+            // the radix (2-10-16)
+            else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
+                function.push(Data::Var(Variable::Int(value)).into());
             }
         }
-        Err(Error::Unimplemented)
+        function
+    }
+
+    fn state_compile(&mut self, mut tokens:VecDeque<String>) -> State {
+        let _ = tokens.pop_front(); // pop the leading`:`
+
+        if let Some(name) = tokens.pop_front() {
+           let function = self.compile(&mut tokens);
+           self.dictionary.add(&name, Code::Routine(function));
+        }
+        State::Interpret
+    }
+
+    fn state_fill_buffer(&mut self, mut buffer: VecDeque<String>, tokens: &mut VecDeque<String>) -> State {
+        while let Some(token) = tokens.pop_front() {
+            
+            // ; indicates end of compilation
+            // we switch over to interpreter mode
+            // and hand over the rest of the input
+            if token == ";" {
+                return State::Compile(buffer);
+            }
+
+            // add all other token to the input
+            else {
+                buffer.push_back(token.to_owned());
+            }
+        }
+
+        return State::FIllBuffer(buffer);
+    }
+
+    pub fn state_error(&self, error: &Error) -> State{
+        (self.write)(&format!("{:#?}", error));
+        State::Interpret
     }
 
     /// Takes an input and evaluates it.
@@ -184,14 +218,22 @@ impl Context {
     /// ```
     /// # use frust::*;
     /// # let mut ctx = Context::new_null();
-    /// # ctx.dictionary.add("+", Code::Native(builtins::plus));
-    /// # ctx.dictionary.add(".", Code::Native(builtins::dot));
+    /// # ctx.dictionary.add("+", Code::Call(builtins::plus));
+    /// # ctx.dictionary.add(".", Code::Call(builtins::dot));
     /// ctx.eval("5 4 + . ");
     /// ```
     pub fn eval(&mut self, input: &str) -> Result<()> {
-        match self.state {
-            State::Interpret => self.interpret(&mut Self::tokenize(input)),
-            State::Compile(_, _) => self.compile(&mut Self::tokenize(input)),
+        let tokens = &mut Self::tokenize(input);
+
+        while !tokens.is_empty() || !self.state.is_idling() {
+            self.state = match mem::take(&mut self.state) {
+                State::Taken => State::Interpret,
+                State::Interpret => self.state_interpret(tokens),
+                State::FIllBuffer(buffer) => self.state_fill_buffer(buffer, tokens),
+                State::Compile(buffer) => self.state_compile(buffer),
+                State::Error(error) => self.state_error(&error),
+            }
         }
+        Ok(())
     }
 }

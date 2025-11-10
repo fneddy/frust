@@ -17,7 +17,7 @@ use crate::Context;
 /// assert_eq!(unimplemented(&mut ctx, &mut empty), Err(Error::Unimplemented));
 /// 
 /// ```
-pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     Err(Error::Unimplemented)
 }
 
@@ -43,7 +43,7 @@ pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result
 /// // Stack error
 ///
 /// ```
-pub fn dot(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn dot(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let v = ctx.value_stack.pop()?;
     (ctx.write)(&format!("{}", v));
     Ok(())
@@ -71,7 +71,7 @@ pub fn dot(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(65)));
 ///
 /// ```
-pub fn plus(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn plus(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a + b);
@@ -100,7 +100,7 @@ pub fn plus(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-19)))
 ///
 /// ```
-pub fn minus(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a - b);
@@ -129,7 +129,7 @@ pub fn minus(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(12)))
 ///
 /// ```
-pub fn times(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn times(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a * b);
@@ -158,7 +158,7 @@ pub fn times(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(4)))
 ///
 /// ```
-pub fn max(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn max(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     if a > b {
@@ -191,7 +191,7 @@ pub fn max(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)))
 ///
 /// ```
-pub fn min(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn min(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     if a < b {
@@ -224,7 +224,7 @@ pub fn min(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(4)))
 ///
 /// ```
-pub fn div(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn div(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a / b);
@@ -255,7 +255,7 @@ pub fn div(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 ///
 /// ```
-pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a.clone() % b.clone());
@@ -284,7 +284,7 @@ pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 ///
 /// ```
 /// 
-pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let value = ctx.value_stack.pop()?;
     ctx.value_stack.push(value.clone());
     ctx.value_stack.push(value);
@@ -311,7 +311,7 @@ pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// 
 /// ```
-pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let a = ctx.value_stack.pop()?;
     let b = ctx.value_stack.pop()?;
     ctx.value_stack.push(a);
@@ -341,7 +341,7 @@ pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// ```
-pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let x3 = ctx.value_stack.pop()?;
     let x2 = ctx.value_stack.pop()?;
     let x1 = ctx.value_stack.pop()?;
@@ -375,7 +375,7 @@ pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
-pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let value = ctx.value_stack.pop()?;
     let _ = ctx.value_stack.pop()?;
     ctx.value_stack.push(value);
@@ -404,7 +404,7 @@ pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// ```
 /// 
-pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(b.clone());
@@ -436,7 +436,7 @@ pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
-pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
     ctx.value_stack.push(a.clone());
@@ -463,7 +463,7 @@ pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
 /// 
-pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let _ = ctx.value_stack.pop()?;
     Ok(())
 }
@@ -472,7 +472,7 @@ pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// - drops everything till end of line
 /// as we only process buffers line by line
 /// its save to just clear the complete buffer here
-pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()> {
     buffer.clear();
     Ok(())
 }
@@ -486,15 +486,15 @@ pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<&str>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::icomment;
-/// let mut buffer: VecDeque<&str>  = vec!["this", "is", "a", "tokenized", "comment)", "forth_code"].into();
+/// let mut buffer: VecDeque<String>  = vec!["this".to_owned(), "is".to_owned(), "a".to_owned(), "tokenized".to_owned(), "comment)".to_owned(), "forth_code".to_owned()].into();
 /// let mut ctx = Context::new_null();
 ///
 /// icomment(&mut ctx, &mut buffer);
 /// 
-/// assert_eq!(buffer.pop_front(), Some("forth_code"));
+/// assert_eq!(buffer.pop_front(), Some("forth_code".to_owned()));
 /// 
 /// ```
-pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()> {
     while let Some(v) = buffer.pop_front() {
         if v.ends_with(")") {
             return Ok(());
@@ -513,7 +513,7 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<&str>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::negate;
-/// # let mut empty: VecDeque<&str>  = vec![].into();
+/// # let mut empty: VecDeque<String>  = vec![].into();
 /// let mut ctx = Context::new_null();
 ///
 /// ctx.value_stack.push(Variable::Int(1));
@@ -524,7 +524,7 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<&str>) -> Result<()> {
 /// 
 /// ```
 /// 
-pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = *v * -1,
@@ -547,7 +547,7 @@ pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::eq;
-/// # let mut empty: VecDeque<&str>  = vec![].into();
+/// # let mut empty: VecDeque<String>  = vec![].into();
 /// let mut ctx = Context::new_null();
 ///
 /// ctx.value_stack.push(1);
@@ -566,7 +566,7 @@ pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// 
 /// ```
 /// 
-pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let a = ctx.value_stack.pop()?;
     let b = ctx.value_stack.pop()?;
     if a == b {
@@ -588,7 +588,7 @@ pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::abs;
-/// # let mut empty: VecDeque<&str>  = vec![].into();
+/// # let mut empty: VecDeque<String>  = vec![].into();
 /// let mut ctx = Context::new_null();
 ///
 /// ctx.value_stack.push(Variable::Int(-1));
@@ -598,7 +598,7 @@ pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// 
 /// ```
-pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
+pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = v.abs(),
@@ -611,7 +611,7 @@ pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<&str>) -> Result<()> {
 /// forth `cr` command
 /// 
 /// prints `\n` to write
-pub fn cr(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     (ctx.write)(&format!("\n"));
     Ok(())
 }
@@ -621,7 +621,7 @@ pub fn cr(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
 /// https://forth-standard.org/standard/core/qDUP
 /// 
 /// 
-pub fn qdup(ctx: &mut Context, _: &mut VecDeque<&str>) -> Result<()> {
+pub fn qdup(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at(0) {
         if *v != Variable::Int(0)  {
             ctx.value_stack.push(v.clone());

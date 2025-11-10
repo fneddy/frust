@@ -1,43 +1,51 @@
-use frust::*;
+use frust::{*};
 
 fn main() {
     let mut ctx = Context::new_stdio();
-    ctx.dictionary.add("+", Code::Native(builtins::plus));
-    ctx.dictionary.add("-", Code::Native(builtins::minus));
-    ctx.dictionary.add("*", Code::Native(builtins::times));
-    ctx.dictionary.add("/", Code::Native(builtins::div));
+    ctx.dictionary.add("+", Code::Call(builtins::plus));
+    ctx.dictionary.add("-", Code::Call(builtins::minus));
+    ctx.dictionary.add("*", Code::Call(builtins::times));
+    ctx.dictionary.add("/", Code::Call(builtins::div));
     ctx.dictionary
-        .add("mod", Code::Native(builtins::modulo));
+        .add("mod", Code::Call(builtins::modulo));
     ctx.dictionary
-        .add("\\", Code::Native(builtins::lcomment));
+        .add("\\", Code::Call(builtins::lcomment));
     ctx.dictionary
-        .add("(", Code::Native(builtins::icomment));
-    ctx.dictionary.add(".", Code::Native(builtins::dot));
-    ctx.dictionary.add("dup", Code::Native(builtins::dup));
-    ctx.dictionary.add(".s", Code::Native(builtins::dot_s));
-    ctx.dictionary.add("abs", Code::Native(builtins::abs));
-    ctx.dictionary.add("=", Code::Native(builtins::eq));
-    ctx.dictionary.add("max", Code::Native(builtins::max));
-    ctx.dictionary.add("min", Code::Native(builtins::min));
-    ctx.dictionary.add("nip", Code::Native(builtins::nip));
+        .add("(", Code::Call(builtins::icomment));
+    ctx.dictionary.add(".", Code::Call(builtins::dot));
+    ctx.dictionary.add("dup", Code::Call(builtins::dup));
+    ctx.dictionary.add(".s", Code::Call(builtins::dot_s));
+    ctx.dictionary.add("abs", Code::Call(builtins::abs));
+    ctx.dictionary.add("=", Code::Call(builtins::eq));
+    ctx.dictionary.add("max", Code::Call(builtins::max));
+    ctx.dictionary.add("min", Code::Call(builtins::min));
+    ctx.dictionary.add("nip", Code::Call(builtins::nip));
     ctx.dictionary
-        .add("roll", Code::Native(builtins::unimplemented));
+        .add("roll", Code::Call(builtins::unimplemented));
     ctx.dictionary
-        .add("pick", Code::Native(builtins::unimplemented));
+        .add("pick", Code::Call(builtins::unimplemented));
     ctx.dictionary
-        .add("over", Code::Native(builtins::over));
+        .add("over", Code::Call(builtins::over));
     ctx.dictionary
-        .add("tuck", Code::Native(builtins::tuck));
+        .add("tuck", Code::Call(builtins::tuck));
     ctx.dictionary
-        .add("negate", Code::Native(builtins::negate));
-    ctx.dictionary.add("dup", Code::Native(builtins::dup));
+        .add("negate", Code::Call(builtins::negate));
+    ctx.dictionary.add("dup", Code::Call(builtins::dup));
     ctx.dictionary
-        .add("swap", Code::Native(builtins::swap));
-    ctx.dictionary.add("rot", Code::Native(builtins::rot));
+        .add("swap", Code::Call(builtins::swap));
+    ctx.dictionary.add("rot", Code::Call(builtins::rot));
     ctx.dictionary
-        .add("drop", Code::Native(builtins::drop));
+        .add("drop", Code::Call(builtins::drop));
     ctx.dictionary
-        .add("?dup", Code::Native(builtins::qdup));
+        .add("?dup", Code::Call(builtins::qdup));
+
+    ctx.dictionary.add("if",Code::Compiled(builtins::runtime_if, builtins::compiletime_if));
+    ctx.dictionary.add("else",Code::Label("ELSE".to_owned()));
+    ctx.dictionary.add("then",Code::Label("THEN".to_owned()));
+    
+    
+    ctx.dictionary.add(".\"",Code::Compiled(builtins::runtime_dot_q, builtins::compiletime_dot_q));
+
     loop {
         let mut buffer = String::new();
         match (ctx.read)(&mut buffer) {

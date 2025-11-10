@@ -63,7 +63,8 @@ impl From<Vec<Variable>> for Data {
 /// `(` will be popped from the input buffer
 /// and all following tokens will be passed as `arg2`.
 /// 
-type WordFunction = fn(&mut Context, &mut VecDeque<&str>) -> Result<()>;
+type WordFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<()>;
+type CompileFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<()>;
 
 /// `Code` represents **named** forth executable ***Code***
 /// 
@@ -74,17 +75,25 @@ type WordFunction = fn(&mut Context, &mut VecDeque<&str>) -> Result<()>;
 /// 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Code {
-    Native(WordFunction),
-    Dynamic(Vec<DictionaryEntry>),
+    Call(WordFunction),
+    Compiled(WordFunction,CompileFunction),
+    Routine(Vec<DictionaryEntry>),
+    Branch(Vec<Code>),
+    Label(String),
 }
 impl From<WordFunction> for Code {
     fn from(value: WordFunction) -> Self {
-        Code::Native(value)
+        Code::Call(value)
+    }
+}
+impl From<(WordFunction,CompileFunction)> for Code {
+    fn from(value: (WordFunction,CompileFunction)) -> Self {
+        Code::Compiled(value.0, value.1)
     }
 }
 impl From<Vec<DictionaryEntry>> for Code {
     fn from(value: Vec<DictionaryEntry>) -> Self {
-        Code::Dynamic(value)
+        Code::Routine(value)
     }
 }
 
@@ -160,14 +169,15 @@ impl Dictionary {
         }
     }
 
-    pub fn add<T>(&mut self, name: &str, value: T)
+
+    pub fn add<T>(&mut self, name: &str, dict_value: T)
     where
         T: Into<DictionaryEntry>,
     {
-        self.data.insert(name.to_string(), value.into());
+        self.data.insert(name.to_string(), dict_value.into());
     }
 
-    pub fn get(&self, name: &str) -> Option<&DictionaryEntry> {
-        self.data.get(&name.to_lowercase())
+    pub fn get(&self, name: &str) -> Option<DictionaryEntry> {
+        self.data.get(&name.to_lowercase()).cloned()
     }
 }
