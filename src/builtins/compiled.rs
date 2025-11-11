@@ -40,7 +40,7 @@ pub fn compiletime_if(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()>
 
 
 pub fn runtime_dot_q(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-   todo!()
+   Ok(())
 }
 
 pub fn compiletime_dot_q(ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<()> {

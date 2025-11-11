@@ -8,8 +8,8 @@ pub enum State {
     Interpret,
     FIllBuffer(VecDeque<String>),
     Compile(VecDeque<String>),
-    Error(Error),
 }
+
 impl State {
     pub fn is_idling(&self) -> bool {
         match &self {
@@ -17,7 +17,6 @@ impl State {
             State::Interpret => true,
             State::FIllBuffer(_) => true,
             State::Compile(_) => false,
-            State::Error(_) => false,
         }
     }
 }
@@ -31,6 +30,7 @@ pub struct Context {
     pub write: fn(&str),
     pub read: fn(&mut String) -> std::io::Result<usize>,
     pub state: State,
+    pub handle_errors: bool,
 }
 
 impl Context {
@@ -90,6 +90,7 @@ impl Context {
             write,
             read,
             state: State::Interpret,
+            handle_errors: true,
         }
     }
 
@@ -101,29 +102,43 @@ impl Context {
     /// assert_eq!("This", tokens.pop_front());
     /// ```
     fn tokenize(input: &str) -> VecDeque<String> {
-        input.split_whitespace().map(|token| token.to_owned()).collect()
+        input
+            .split_whitespace()
+            .map(|token| token.to_owned())
+            .collect()
     }
 
     /// executes an entry from the dictionary
     fn execute(&mut self, function: DictionaryEntry, tokens: &mut VecDeque<String>) -> Result<()> {
-        match (&function.code, &function.data) {
-            (Some(Code::Call(function)), None) => {
-                let _ = function(self, tokens)?;
-                Ok(())
+        if let Some(Data::Var(data)) = function.data {
+            return Ok(self.value_stack.push(data));
+        } else if let Some(code) = function.code {
+            match &code {
+                Code::Call(function) => {
+                    let _ = function(self, tokens)?;
+                    Ok(())
+                }
+                Code::Routine(function) => {
+                    for step in function {
+                        self.execute(step.clone(), tokens)?
+                    }
+                    Ok(())
+                }
+                Code::Compiled(runtime, _) => {
+                    let _ = runtime(self, tokens)?;
+                    Ok(())
+                }
+                _ => {
+                    Err(Error::Executor)
+                }
             }
-            (Some(Code::Routine(function)), None) => {for step in function {
-                self.execute(step.clone(), tokens)?
-            }
-            Ok(())
-            },
-            (None, Some(Data::Var(value))) => Ok(self.value_stack.push(value)),
-            _ => Err(Error::Executor),
+        } else {
+             Err(Error::Executor)
         }
     }
 
     /// interpret forth tokens
-    fn state_interpret(&mut self, tokens: &mut VecDeque<String>) -> State {
-
+    fn state_interpret(&mut self, tokens: &mut VecDeque<String>) -> Result<State> {
         // : indicates start of compilation.
         // we switch to input buffering until we see ;
         // so we can compile the complete function in one go
@@ -132,43 +147,42 @@ impl Context {
         }
 
         // interprete all input token by token
-        while let Some(token) = tokens.pop_front() {   
-            
+        while let Some(token) = tokens.pop_front() {
             // is this token a word from the dictionary we execute it
             if let Some(word) = self.dictionary.get(&token) {
                 if let Err(error) = self.execute(word, tokens) {
-                    return State::Error(error)
+                    return Err(error);
                 }
             }
-
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
             // the radix (2-10-16)
             else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
                 self.value_stack.push(Variable::Int(value));
             }
-            
             // we don't know how to handle this token
             else {
                 (self.write)(&format!("{} not valid", token));
-                return State::Error(Error::Parser);
+                return Err(Error::Parser);
             }
         }
 
-        State::Interpret
+        Ok(State::Interpret)
     }
 
-    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Vec<DictionaryEntry> {
+    // actual "compilation" step
+    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Vec<DictionaryEntry>> {
         let mut function: Vec<DictionaryEntry> = Vec::new();
         while let Some(token) = tokens.pop_front() {
-            // if this is a valid word from our dictionary we add this to the function to be callable later
-            // note: we clone the complete function in case it gets overwritten we still use the old function.
-            // note: this means you cannot recuse a forth word!
+            // if this is a valid word from our dictionary
+            // add this to the function to be callable later
             if let Some(word) = self.dictionary.get(&token) {
-                let _ = self.execute(word.clone(), tokens);
+                if let Some(Code::Compiled(_, compiletime)) = word.code {
+                    compiletime(self, tokens)?
+                }
+
                 function.push(word);
             }
-
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
             // the radix (2-10-16)
@@ -176,41 +190,52 @@ impl Context {
                 function.push(Data::Var(Variable::Int(value)).into());
             }
         }
-        function
+        Ok(function)
     }
 
-    fn state_compile(&mut self, mut tokens:VecDeque<String>) -> State {
+    /// transition the compilation state
+    fn state_compile(&mut self, mut tokens: VecDeque<String>) -> Result<State> {
         let _ = tokens.pop_front(); // pop the leading`:`
 
         if let Some(name) = tokens.pop_front() {
-           let function = self.compile(&mut tokens);
-           self.dictionary.add(&name, Code::Routine(function));
+            let function = self.compile(&mut tokens)?;
+            
+            self.dictionary.add(&name, Code::Routine(function));
         }
-        State::Interpret
+        Ok(State::Interpret)
     }
 
-    fn state_fill_buffer(&mut self, mut buffer: VecDeque<String>, tokens: &mut VecDeque<String>) -> State {
+    /// stays in fill buffer state until it sees a ';'
+    fn state_fill_buffer(
+        &mut self,
+        mut buffer: VecDeque<String>,
+        tokens: &mut VecDeque<String>,
+    ) -> Result<State> {
         while let Some(token) = tokens.pop_front() {
-            
             // ; indicates end of compilation
             // we switch over to interpreter mode
             // and hand over the rest of the input
             if token == ";" {
-                return State::Compile(buffer);
+                return Ok(State::Compile(buffer));
             }
-
             // add all other token to the input
             else {
                 buffer.push_back(token.to_owned());
             }
         }
 
-        return State::FIllBuffer(buffer);
+        return Ok(State::FIllBuffer(buffer));
     }
 
-    pub fn state_error(&self, error: &Error) -> State{
+    /// prints error message and resets state machine if wanted
+    pub fn state_error(&self, error: Error) -> Result<State> {
         (self.write)(&format!("{:#?}", error));
-        State::Interpret
+        if self.handle_errors {
+            Ok(State::Interpret)
+        }
+        else {
+            Err(error)
+        }
     }
 
     /// Takes an input and evaluates it.
@@ -226,12 +251,16 @@ impl Context {
         let tokens = &mut Self::tokenize(input);
 
         while !tokens.is_empty() || !self.state.is_idling() {
-            self.state = match mem::take(&mut self.state) {
-                State::Taken => State::Interpret,
+
+            let new_state = match mem::take(&mut self.state) {
+                State::Taken => Ok(State::Interpret),
                 State::Interpret => self.state_interpret(tokens),
                 State::FIllBuffer(buffer) => self.state_fill_buffer(buffer, tokens),
-                State::Compile(buffer) => self.state_compile(buffer),
-                State::Error(error) => self.state_error(&error),
+                State::Compile(buffer) => self.state_compile(buffer)
+            };
+            match new_state {
+                Ok(state) => self.state = state,
+                Err(error) => { self.state = self.state_error(error)? }
             }
         }
         Ok(())
