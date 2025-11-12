@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Display};
+use std::{ fmt::Display};
 
 /// value on the stack
 /// - `String`: owned string
@@ -7,6 +7,7 @@ use std::{borrow::Cow, fmt::Display};
 /// TODO: test
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Variable {
+    Array(Vec<Variable>),
     String(String),
     Int(i64),
 }
@@ -15,9 +16,9 @@ impl From<i64> for Variable {
         Variable::Int(value)
     }
 }
-impl From<Cow<'_, str>> for Variable {
-    fn from(value: Cow<str>) -> Self {
-        Variable::String(value.into_owned())
+impl From<&str> for Variable {
+    fn from(value: &str) -> Self {
+        Variable::String(value.to_owned())
     }
 }
 impl From<&Variable> for Variable {
@@ -25,11 +26,29 @@ impl From<&Variable> for Variable {
         value.clone()
     }
 }
+impl From<Vec<Variable>> for Variable {
+    fn from(value: Vec<Variable>) -> Self {
+        Variable::Array(value)
+    }
+}
+impl From<Vec<String>> for Variable {
+    fn from(values: Vec<String>) -> Self {
+        let collection: Vec<Variable> = values.iter().map(|value| Variable::from(value.as_str())).collect();
+        Variable::Array(collection)
+    }
+}
+impl From<Vec<i64>> for Variable {
+    fn from(values: Vec<i64>) -> Self {
+        let collection: Vec<Variable> = values.iter().map(|value| Variable::from(*value)).collect();
+        Variable::Array(collection)
+    }
+}
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Int(v) => write!(f, "{}", v), // TODO evaluate value mode
             Self::String(v) => write!(f, "{}", v),
+            Self::Array(values) => values.iter().map(|v| write!(f, "{}", v)).collect(),
         }
     }
 }

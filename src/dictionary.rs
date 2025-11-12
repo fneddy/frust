@@ -1,55 +1,6 @@
 use crate::{Context, Result, Variable};
 use std::collections::{HashMap, VecDeque};
 
-/// `Data` represents **named** forth ***Data***. 
-/// 
-/// `Data` may be either:
-/// 
-/// `Constant` - can not be changed
-/// `Var` - can be changed
-/// `Array` - multiple `Variable` instances
-///
-/// TODO are arrays always variables?
-///
-/// its possible to crate Data from a Variable
-/// ```
-/// # use frust::Variable;
-/// # use frust::Data;
-/// let x: Variable = 1.into();
-/// let y: Data = x.into();
-/// assert_eq!(y, Data::Var(Variable::Int(1)))
-/// ```
-///
-/// also ts possible to crate Data from a Vec<Variable>
-/// ```
-/// # use frust::Variable;
-/// # use frust::Data;
-/// let x: Vec<Variable> = vec![1.into(), 2.into(), 3.into()];
-/// let y: Data = x.into();
-/// assert_eq!(y, Data::Array(
-/// 		vec![Variable::Int(1),Variable::Int(2),Variable::Int(3)]
-/// ))
-/// ```
-#[derive(Debug, PartialEq, Clone)]
-pub enum Data {
-    Var(Variable),
-    Constant(Variable),
-    Array(Vec<Variable>),
-}
-
-/// Create a `Data` from a Variable
-impl From<Variable> for Data {
-    fn from(value: Variable) -> Self {
-        Data::Var(value)
-    }
-}
-
-/// Create a `Data-Array` from a `Vec<Variable>`
-impl From<Vec<Variable>> for Data {
-    fn from(value: Vec<Variable>) -> Self {
-        Data::Array(value)
-    }
-}
 
 /// interface for rust `word-functions`
 /// 
@@ -58,102 +9,49 @@ impl From<Vec<Variable>> for Data {
 /// - `Context`: the forth context to operate on
 /// - `VecDeque<&str>`: rest of the input buffer **AFTER** our word was called from forth
 /// 
-/// if the forth input looks like this `( this is a comment) some forth code`
+/// if the forth input looks like this `( this is a comment) some forth Cell`
 /// 
 /// `(` will be popped from the input buffer
 /// and all following tokens will be passed as `arg2`.
 /// 
 type WordFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<()>;
-type CompileFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<()>;
+type CompileFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<Cell>;
 
-/// `Code` represents **named** forth executable ***Code***
+/// `Cell` represents **named** forth executable ***Cell***
 /// 
-/// `Code` may be either
+/// `Cell` may be either
 /// 
-/// - `Native`: rust code that will operate on the forth context and input-buffer
-/// - `Dynamic`: forth code written in forth and *compiled*.
+/// - `Native`: rust Cell that will operate on the forth context and input-buffer
+/// - `Dynamic`: forth Cell written in forth and *compiled*.
 /// 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Code {
+pub enum Cell {
     Call(WordFunction),
     Compiled(WordFunction,CompileFunction),
-    Routine(Vec<DictionaryEntry>),
-    Branch(Vec<Code>),
+    Routine(Vec<Cell>),
+    Branch(WordFunction,Vec<Cell>),
     Label(String),
+    Data(Variable),
 }
-impl From<WordFunction> for Code {
+impl From<WordFunction> for Cell {
     fn from(value: WordFunction) -> Self {
-        Code::Call(value)
+        Cell::Call(value)
     }
 }
-impl From<(WordFunction,CompileFunction)> for Code {
+impl From<(WordFunction,CompileFunction)> for Cell {
     fn from(value: (WordFunction,CompileFunction)) -> Self {
-        Code::Compiled(value.0, value.1)
+        Cell::Compiled(value.0, value.1)
     }
 }
-impl From<Vec<DictionaryEntry>> for Code {
-    fn from(value: Vec<DictionaryEntry>) -> Self {
-        Code::Routine(value)
-    }
-}
-
-///
-#[derive(Debug, PartialEq, Clone)]
-pub struct DictionaryEntry {
-    pub code: Option<Code>,
-    pub data: Option<Data>,
-}
-impl From<Code> for DictionaryEntry {
-    fn from(value: Code) -> Self {
-        DictionaryEntry {
-            code: Some(value),
-            data: None,
-        }
-    }
-}
-impl From<Data> for DictionaryEntry {
-    fn from(value: Data) -> Self {
-        DictionaryEntry {
-            code: None,
-            data: Some(value),
-        }
-    }
-}
-impl From<(Code, Data)> for DictionaryEntry {
-    fn from(value: (Code, Data)) -> Self {
-        DictionaryEntry {
-            code: Some(value.0),
-            data: Some(value.1),
-        }
+impl From<Vec<Cell>> for Cell {
+    fn from(value: Vec<Cell>) -> Self {
+        Cell::Routine(value)
     }
 }
 
-//                                                             
-//                      ┌────────────┐                         
-//                      │ Dictionary │                         
-//                      │   ┌─────┐  │                         
-//                      │   │ Name│  │                         
-//                      └───└──┬──┘──┘                         
-//                             │                               
-//                             ▼                               
-//                     ┌───────────────┐                       
-//                     │DictionaryEntry│                       
-//                     │               │                       
-//                     │code<Code>─────┼──┐                    
-//   ┌─────────────────┤data<Data>     │  │                    
-//   │                 └───────────────┘  │                    
-//   ▼                                    ▼                    
-// ┌────────────────────┐              ┌────────────────────┐  
-// │Data                │              │Code                │  
-// │                    │              │                    │  
-// │Var<Variable>       │              │Native<WordFunction>│  
-// │Const<Variable>     │              │Dynamic<Vec<DictionaryEntry>>  │  
-// │Array<Vec<Variable>>│              └────────────────────┘  
-// └────────────────────┘                                      
-//                                                             
 #[derive(Debug, PartialEq)]
 pub struct Dictionary {
-    data: HashMap<String, DictionaryEntry>,
+    data: HashMap<String, Cell>,
 }
 
 impl Dictionary {
@@ -172,12 +70,12 @@ impl Dictionary {
 
     pub fn add<T>(&mut self, name: &str, dict_value: T)
     where
-        T: Into<DictionaryEntry>,
+        T: Into<Cell>,
     {
         self.data.insert(name.to_string(), dict_value.into());
     }
 
-    pub fn get(&self, name: &str) -> Option<DictionaryEntry> {
+    pub fn get(&self, name: &str) -> Option<Cell> {
         self.data.get(&name.to_lowercase()).cloned()
     }
 }

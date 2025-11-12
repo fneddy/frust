@@ -1,4 +1,4 @@
-use crate::{Code, Data, Dictionary, DictionaryEntry, Error, Result, Stack, Variable};
+use crate::{Cell,  Dictionary, Error, Result, Stack, Variable};
 use std::{collections::VecDeque, io::BufRead, mem};
 
 #[derive(Debug, Default)]
@@ -109,31 +109,15 @@ impl Context {
     }
 
     /// executes an entry from the dictionary
-    fn execute(&mut self, function: DictionaryEntry, tokens: &mut VecDeque<String>) -> Result<()> {
-        if let Some(Data::Var(data)) = function.data {
-            return Ok(self.value_stack.push(data));
-        } else if let Some(code) = function.code {
-            match &code {
-                Code::Call(function) => {
-                    let _ = function(self, tokens)?;
-                    Ok(())
-                }
-                Code::Routine(function) => {
-                    for step in function {
-                        self.execute(step.clone(), tokens)?
-                    }
-                    Ok(())
-                }
-                Code::Compiled(runtime, _) => {
-                    let _ = runtime(self, tokens)?;
-                    Ok(())
-                }
-                _ => {
-                    Err(Error::Executor)
-                }
-            }
-        } else {
-             Err(Error::Executor)
+    fn execute(&mut self, function: Cell, tokens: &mut VecDeque<String>) -> Result<()> {
+        
+        match function {
+            Cell::Call(function) => function(self, tokens),
+            Cell::Routine(functions) => functions.iter().map(|function| self.execute(function.clone(), tokens)).collect(),
+            Cell::Compiled(rt_function,_) => rt_function(self,tokens),
+            Cell::Label(_) => Ok(()),
+            Cell::Branch(_,_) => Ok(()),
+            Cell::Data(data) => { self.value_stack.push(data); Ok(())},
         }
     }
 
@@ -171,26 +155,25 @@ impl Context {
     }
 
     // actual "compilation" step
-    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Vec<DictionaryEntry>> {
-        let mut function: Vec<DictionaryEntry> = Vec::new();
+    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Cell> {
+        let mut function: Vec<Cell> = Vec::new();
         while let Some(token) = tokens.pop_front() {
             // if this is a valid word from our dictionary
             // add this to the function to be callable later
             if let Some(word) = self.dictionary.get(&token) {
-                if let Some(Code::Compiled(_, compiletime)) = word.code {
-                    compiletime(self, tokens)?
+                match word {
+                    Cell::Compiled(_,ct_func) => function.push(ct_func(self,tokens)?),
+                    _ => function.push(word),
                 }
-
-                function.push(word);
             }
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
             // the radix (2-10-16)
             else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
-                function.push(Data::Var(Variable::Int(value)).into());
+                function.push(Cell::Data(Variable::Int(value)).into());
             }
         }
-        Ok(function)
+        Ok(Cell::Routine(function))
     }
 
     /// transition the compilation state
@@ -200,7 +183,7 @@ impl Context {
         if let Some(name) = tokens.pop_front() {
             let function = self.compile(&mut tokens)?;
             
-            self.dictionary.add(&name, Code::Routine(function));
+            self.dictionary.add(&name, function);
         }
         Ok(State::Interpret)
     }
@@ -243,8 +226,8 @@ impl Context {
     /// ```
     /// # use frust::*;
     /// # let mut ctx = Context::new_null();
-    /// # ctx.dictionary.add("+", Code::Call(builtins::plus));
-    /// # ctx.dictionary.add(".", Code::Call(builtins::dot));
+    /// # ctx.dictionary.add("+", Cell::Call(builtins::plus));
+    /// # ctx.dictionary.add(".", Cell::Call(builtins::dot));
     /// ctx.eval("5 4 + . ");
     /// ```
     pub fn eval(&mut self, input: &str) -> Result<()> {

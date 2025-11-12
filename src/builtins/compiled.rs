@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{Context, Error, Result, Variable};
+use crate::*;
 
 /// forth `if` command runtime evaluation
 /// 
@@ -34,21 +34,25 @@ pub fn runtime_if(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// 
 /// ```
 /// 
-pub fn compiletime_if(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    todo!()
+pub fn compiletime_if(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<Cell> {
+    Ok(Cell::Branch(runtime_if, vec![]))
 }
 
 
 pub fn runtime_dot_q(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-   Ok(())
+    let comment = ctx.value_stack.pop()?;
+    (ctx.write)(&format!("{}",comment));
+    Ok(())
 }
 
-pub fn compiletime_dot_q(ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<()> {
+pub fn compiletime_dot_q(ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<Cell> {
     let mut buffer = String::new();
     while let Some(token) = tokens.pop_front() {
         
         if token == "\"" {
-            return Ok(())
+            let comment = Cell::Data(Variable::from(buffer.as_str()));
+            let entry = Cell::Call(runtime_dot_q);
+            return Ok(Cell::Routine(vec![comment, entry]));
         }
         buffer.push_str(" ");
         buffer.push_str(&token);
