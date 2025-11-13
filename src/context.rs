@@ -22,13 +22,12 @@ impl State {
 }
 
 /// Complete context of the forth env
-#[derive(Debug)]
 pub struct Context {
     pub value_stack: Stack,
     pub return_stack: Stack,
     pub dictionary: Dictionary,
-    pub write: fn(&str),
-    pub read: fn(&mut String) -> std::io::Result<usize>,
+    pub write: Box<dyn Fn(&str)>,
+    pub read: Box<dyn Fn(&mut String) -> std::io::Result<usize>>,
     pub state: State,
     pub handle_errors: bool,
 }
@@ -87,8 +86,8 @@ impl Context {
             value_stack: Stack::new(),
             return_stack: Stack::new(),
             dictionary: Dictionary::new(),
-            write,
-            read,
+            write: Box::new(write),
+            read: Box::new(read),
             state: State::Interpret,
             handle_errors: true,
         }
