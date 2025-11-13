@@ -1,4 +1,4 @@
-use crate::{Cell,  Dictionary, Error, Result, Stack, Variable};
+use crate::{Cell, Dictionary, Error, Result, Stack, Variable};
 use std::{collections::VecDeque, io::BufRead, mem};
 
 #[derive(Debug, Default)]
@@ -109,14 +109,19 @@ impl Context {
 
     /// executes an entry from the dictionary
     fn execute(&mut self, function: Cell, tokens: &mut VecDeque<String>) -> Result<()> {
-        
         match function {
             Cell::Call(function) => function(self, tokens),
-            Cell::Routine(functions) => functions.iter().map(|function| self.execute(function.clone(), tokens)).collect(),
-            Cell::Compiled(rt_function,_) => rt_function(self,tokens),
+            Cell::Routine(functions) => functions
+                .iter()
+                .map(|function| self.execute(function.clone(), tokens))
+                .collect(),
+            Cell::Compiled(rt_function, _) => rt_function(self, tokens),
             Cell::Label(_) => Ok(()),
-            Cell::Branch(_,_) => Ok(()),
-            Cell::Data(data) => { self.value_stack.push(data); Ok(())},
+            Cell::Branch(_, _) => Ok(()),
+            Cell::Data(data) => {
+                self.value_stack.push(data);
+                Ok(())
+            }
         }
     }
 
@@ -161,7 +166,7 @@ impl Context {
             // add this to the function to be callable later
             if let Some(word) = self.dictionary.get(&token) {
                 match word {
-                    Cell::Compiled(_,ct_func) => function.push(ct_func(self,tokens)?),
+                    Cell::Compiled(_, ct_func) => function.push(ct_func(self, tokens)?),
                     _ => function.push(word),
                 }
             }
@@ -181,7 +186,7 @@ impl Context {
 
         if let Some(name) = tokens.pop_front() {
             let function = self.compile(&mut tokens)?;
-            
+
             self.dictionary.add(&name, function);
         }
         Ok(State::Interpret)
@@ -214,8 +219,7 @@ impl Context {
         (self.write)(&format!("{:#?}", error));
         if self.handle_errors {
             Ok(State::Interpret)
-        }
-        else {
+        } else {
             Err(error)
         }
     }
@@ -233,16 +237,15 @@ impl Context {
         let tokens = &mut Self::tokenize(input);
 
         while !tokens.is_empty() || !self.state.is_idling() {
-
             let new_state = match mem::take(&mut self.state) {
                 State::Taken => Ok(State::Interpret),
                 State::Interpret => self.state_interpret(tokens),
                 State::FIllBuffer(buffer) => self.state_fill_buffer(buffer, tokens),
-                State::Compile(buffer) => self.state_compile(buffer)
+                State::Compile(buffer) => self.state_compile(buffer),
             };
             match new_state {
                 Ok(state) => self.state = state,
-                Err(error) => { self.state = self.state_error(error)? }
+                Err(error) => self.state = self.state_error(error)?,
             }
         }
         Ok(())

@@ -1,4 +1,4 @@
-use std::{ fmt::Display};
+use std::fmt::Display;
 
 /// value on the stack
 /// - `String`: owned string
@@ -33,7 +33,10 @@ impl From<Vec<Variable>> for Variable {
 }
 impl From<Vec<String>> for Variable {
     fn from(values: Vec<String>) -> Self {
-        let collection: Vec<Variable> = values.iter().map(|value| Variable::from(value.as_str())).collect();
+        let collection: Vec<Variable> = values
+            .iter()
+            .map(|value| Variable::from(value.as_str()))
+            .collect();
         Variable::Array(collection)
     }
 }

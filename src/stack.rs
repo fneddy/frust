@@ -14,7 +14,10 @@ impl Stack {
     pub fn new() -> Stack {
         Stack { val: vec![] }
     }
-    pub fn push<T>(&mut self, value: T) where T: Into<Variable> {
+    pub fn push<T>(&mut self, value: T)
+    where
+        T: Into<Variable>,
+    {
         self.val.push(value.into());
     }
 

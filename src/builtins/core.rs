@@ -5,9 +5,9 @@ use crate::{Error, Result, Variable};
 use crate::Context;
 
 /// not a real forth command
-/// 
+///
 /// - dummy that always fails
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -15,7 +15,7 @@ use crate::Context;
 /// # let mut empty = VecDeque::new();
 /// let mut ctx = Context::new_null();
 /// assert_eq!(unimplemented(&mut ctx, &mut empty), Err(Error::Unimplemented));
-/// 
+///
 /// ```
 pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     Err(Error::Unimplemented)
@@ -264,11 +264,11 @@ pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `dup` command
-/// 
+///
 /// https://forth-standard.org/standard/core/DUP
-/// 
+///
 /// - duplicates the last element of the value stack
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -278,12 +278,12 @@ pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(9);
 ///
 /// dup(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
 ///
 /// ```
-/// 
+///
 pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let value = ctx.value_stack.pop()?;
     ctx.value_stack.push(value.clone());
@@ -294,7 +294,7 @@ pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// forth `swap` command
 ///
 /// https://forth-standard.org/standard/core/SWAP
-/// 
+///
 /// - exchange the last two elements on value stack
 /// ```
 /// # use frust::*;
@@ -306,10 +306,10 @@ pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(1);
 ///
 /// swap(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
-/// 
+///
 /// ```
 pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let a = ctx.value_stack.pop()?;
@@ -320,11 +320,11 @@ pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `rot` command
-/// 
+///
 /// https://forth-standard.org/standard/core/ROT
-/// 
+///
 /// - rotate last 3 value on value stack
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -336,7 +336,7 @@ pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(3);
 ///
 /// rot(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
@@ -352,14 +352,14 @@ pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// the forth `nip` command
-/// 
+///
 /// https://forth-standard.org/standard/core/NIP
-/// 
+///
 /// - pop two values
 /// - push back only top value
-/// 
+///
 /// electively deletes the value for the top value
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -371,7 +371,7 @@ pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(3);
 ///
 /// nip(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
@@ -383,11 +383,11 @@ pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// the forth `tuck` command
-/// 
+///
 /// - pop two elements
 /// - push back in the same order
 /// - push back copy of last element
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -398,12 +398,12 @@ pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(2);
 ///
 /// tuck(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// ```
-/// 
+///
 pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let b = ctx.value_stack.pop()?;
     let a = ctx.value_stack.pop()?;
@@ -414,13 +414,13 @@ pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// the forth `over` command
-/// 
+///
 /// https://forth-standard.org/standard/core/OVER
-/// 
+///
 /// - pop two elements
 /// - push back copy of last element
 /// - push back in the same order
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -431,7 +431,7 @@ pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(2);
 ///
 /// over(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
@@ -446,9 +446,9 @@ pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `drop` command
-/// 
+///
 /// removes last element from stack
-/// 
+///
 /// ```
 /// # use frust::*;
 /// # use std::collections::VecDeque;
@@ -459,10 +459,10 @@ pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// ctx.value_stack.push(2);
 ///
 /// drop(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
-/// 
+///
 pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let _ = ctx.value_stack.pop()?;
     Ok(())
@@ -479,9 +479,9 @@ pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 
 /// forth `()` comment
 /// - drops everything till closing `)`
-/// 
+///
 /// https://forth-standard.org/standard/core/p
-/// 
+///
 /// ```
 /// # use std::collections::VecDeque;
 /// # use frust::*;
@@ -490,9 +490,9 @@ pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 /// let mut ctx = Context::new_null();
 ///
 /// icomment(&mut ctx, &mut buffer);
-/// 
+///
 /// assert_eq!(buffer.pop_front(), Some("forth_code".to_owned()));
-/// 
+///
 /// ```
 pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()> {
     while let Some(v) = buffer.pop_front() {
@@ -504,11 +504,11 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 }
 
 /// forth `negate` command
-/// 
+///
 /// https://forth-standard.org/standard/core/NEGATE
-/// 
+///
 /// - negates last stack value if its integer
-/// 
+///
 /// ```
 /// # use std::collections::VecDeque;
 /// # use frust::*;
@@ -517,13 +517,13 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 /// let mut ctx = Context::new_null();
 ///
 /// ctx.value_stack.push(Variable::Int(1));
-/// 
+///
 /// negate(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
-/// 
+///
 /// ```
-/// 
+///
 pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at_mut(0) {
         match v {
@@ -535,14 +535,14 @@ pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `=` command
-/// 
+///
 /// https://forth-standard.org/standard/core/Equal
-/// 
+///
 /// - pops last two elements from stack
 /// - compares them
 /// - if equal writes `true` (-1) on the stack
-/// - else 0 
-/// 
+/// - else 0
+///
 /// ```
 /// # use std::collections::VecDeque;
 /// # use frust::*;
@@ -552,20 +552,20 @@ pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 ///
 /// ctx.value_stack.push(1);
 /// ctx.value_stack.push(1);
-/// 
+///
 /// eq(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
-/// 
+///
 /// ctx.value_stack.push(Variable::String("foo".into()));
 /// ctx.value_stack.push(Variable::String("foo".into()));
-/// 
+///
 /// eq(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
-/// 
+///
 /// ```
-/// 
+///
 pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     let a = ctx.value_stack.pop()?;
     let b = ctx.value_stack.pop()?;
@@ -578,12 +578,12 @@ pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `abs` command
-/// 
+///
 /// https://forth-standard.org/standard/core/ABS
-/// 
+///
 /// - pops last element
 /// - pushes abs value of last element
-/// 
+///
 /// ```
 /// # use std::collections::VecDeque;
 /// # use frust::*;
@@ -592,11 +592,11 @@ pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// let mut ctx = Context::new_null();
 ///
 /// ctx.value_stack.push(Variable::Int(-1));
-/// 
+///
 /// abs(&mut ctx, &mut empty);
-/// 
+///
 /// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
-/// 
+///
 /// ```
 pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at_mut(0) {
@@ -609,7 +609,7 @@ pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `cr` command
-/// 
+///
 /// prints `\n` to write
 pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     (ctx.write)(&format!("\n"));
@@ -617,13 +617,13 @@ pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 }
 
 /// forth `?dup` command
-/// 
+///
 /// https://forth-standard.org/standard/core/qDUP
-/// 
-/// 
+///
+///
 pub fn qdup(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     if let Ok(v) = ctx.value_stack.at(0) {
-        if *v != Variable::Int(0)  {
+        if *v != Variable::Int(0) {
             ctx.value_stack.push(v.clone());
         }
     }
