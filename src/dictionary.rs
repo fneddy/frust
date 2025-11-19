@@ -1,5 +1,5 @@
-use crate::{Context, Result, Variable};
-use std::collections::{HashMap, VecDeque};
+use crate::{Context, Error, Result, Variable};
+use std::{collections::{HashMap, VecDeque}, fmt::{Debug, Display}};
 
 /// interface for rust `word-functions`
 ///
@@ -23,23 +23,44 @@ type CompileFunction = fn(&mut Context, &mut VecDeque<String>) -> Result<Cell>;
 /// - `Native`: rust Cell that will operate on the forth context and input-buffer
 /// - `Dynamic`: forth Cell written in forth and *compiled*.
 ///
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Cell {
-    Call(WordFunction),
-    Compiled(WordFunction, CompileFunction),
+    Exec(WordFunction),
+    Compiled(CompileFunction),
     Routine(Vec<Cell>),
     Branch(WordFunction, Vec<Cell>),
-    Label(String),
     Data(Variable),
+    Call(String),
+    ControlReturn,
+    ControlBranch,
 }
-impl From<WordFunction> for Cell {
-    fn from(value: WordFunction) -> Self {
-        Cell::Call(value)
+impl PartialEq for Cell {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            //(Self::Exec(l0), Self::Exec(r0)) => l0 == r0,
+            //(Self::Compiled(l0), Self::Compiled(r0)) => l0 == r0,
+            (Self::Routine(l0), Self::Routine(r0)) => l0 == r0,
+            //(Self::Branch(l0, l1), Self::Branch(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Data(l0), Self::Data(r0)) => l0 == r0,
+            (Self::Call(l0), Self::Call(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
     }
 }
-impl From<(WordFunction, CompileFunction)> for Cell {
-    fn from(value: (WordFunction, CompileFunction)) -> Self {
-        Cell::Compiled(value.0, value.1)
+impl Display for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl From<WordFunction> for Cell {
+    fn from(value: WordFunction) -> Self {
+        Cell::Exec(value)
+    }
+}
+impl From<CompileFunction> for Cell {
+    fn from(value: CompileFunction) -> Self {
+        Cell::Compiled(value)
     }
 }
 impl From<Vec<Cell>> for Cell {
@@ -73,7 +94,7 @@ impl Dictionary {
         self.data.insert(name.to_string(), dict_value.into());
     }
 
-    pub fn get(&self, name: &str) -> Option<Cell> {
-        self.data.get(&name.to_lowercase()).cloned()
+    pub fn get(&self, name: &str) -> Result<Cell> {
+        self.data.get(&name.to_lowercase()).cloned().ok_or(Error::Unimplemented(name.to_owned()))
     }
 }

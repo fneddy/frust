@@ -1,5 +1,5 @@
 use crate::{Cell, Dictionary, Error, Result, Stack, Variable};
-use std::{collections::VecDeque, io::BufRead, mem};
+use std::{collections::VecDeque, io::{BufRead, Write}, mem};
 
 #[derive(Debug, Default)]
 pub enum State {
@@ -54,7 +54,8 @@ impl Context {
                 stdin.lock().read_line(buf)
             },
             |buf| {
-                println!("{}", buf);
+                print!("{}", buf);
+                std::io::stdout().flush().unwrap();
             },
         )
     }
@@ -108,20 +109,21 @@ impl Context {
     }
 
     /// executes an entry from the dictionary
-    fn execute(&mut self, function: Cell, tokens: &mut VecDeque<String>) -> Result<()> {
+    pub fn execute(&mut self, function: Cell, tokens: &mut VecDeque<String>) -> Result<()> {
         match function {
-            Cell::Call(function) => function(self, tokens),
+            Cell::Exec(func) => func(self, tokens),
+            Cell::Call(name) => self.execute(self.dictionary.get(&name)?, tokens),
             Cell::Routine(functions) => functions
                 .iter()
                 .map(|function| self.execute(function.clone(), tokens))
                 .collect(),
-            Cell::Compiled(rt_function, _) => rt_function(self, tokens),
-            Cell::Label(_) => Ok(()),
-            Cell::Branch(_, _) => Ok(()),
+            Cell::Compiled(_) => Err(Error::Unimplemented("Compiletime function".to_owned())),
+            Cell::Branch(rt_function, _) => rt_function(self, tokens),
             Cell::Data(data) => {
                 self.value_stack.push(data);
                 Ok(())
             }
+            Cell::ControlReturn => Ok(()),
         }
     }
 
@@ -137,7 +139,7 @@ impl Context {
         // interprete all input token by token
         while let Some(token) = tokens.pop_front() {
             // is this token a word from the dictionary we execute it
-            if let Some(word) = self.dictionary.get(&token) {
+            if let Ok(word) = self.dictionary.get(&token) {
                 if let Err(error) = self.execute(word, tokens) {
                     return Err(error);
                 }
@@ -150,8 +152,7 @@ impl Context {
             }
             // we don't know how to handle this token
             else {
-                (self.write)(&format!("{} not valid", token));
-                return Err(Error::Parser);
+                return Err(Error::Parser(token));
             }
         }
 
@@ -159,14 +160,15 @@ impl Context {
     }
 
     // actual "compilation" step
-    fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Cell> {
+    pub fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Cell> {
         let mut function: Vec<Cell> = Vec::new();
         while let Some(token) = tokens.pop_front() {
             // if this is a valid word from our dictionary
             // add this to the function to be callable later
-            if let Some(word) = self.dictionary.get(&token) {
+            if let Ok(word) = self.dictionary.get(&token) {
                 match word {
-                    Cell::Compiled(_, ct_func) => function.push(ct_func(self, tokens)?),
+                    Cell::Compiled(ct_func) => function.push(ct_func(self, tokens)?),
+                    Cell::Routine(_) => function.push(Cell::Call(token)),
                     _ => function.push(word),
                 }
             }
@@ -175,6 +177,11 @@ impl Context {
             // the radix (2-10-16)
             else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
                 function.push(Cell::Data(Variable::Int(value)).into());
+            }
+            // unknown token,
+            // maybe an error or just a token we are not supposed to compile
+            else {
+                return Err(Error::Compiler(Cell::Routine(function), token));
             }
         }
         Ok(Cell::Routine(function))
@@ -187,7 +194,7 @@ impl Context {
         if let Some(name) = tokens.pop_front() {
             let function = self.compile(&mut tokens)?;
 
-            self.dictionary.add(&name, function);
+            self.dictionary.add(&name.to_lowercase(), function);
         }
         Ok(State::Interpret)
     }
@@ -216,7 +223,7 @@ impl Context {
 
     /// prints error message and resets state machine if wanted
     pub fn state_error(&self, error: Error) -> Result<State> {
-        (self.write)(&format!("{:#?}", error));
+        (self.write)(&format!("Error: {}\n", error));
         if self.handle_errors {
             Ok(State::Interpret)
         } else {
@@ -229,8 +236,8 @@ impl Context {
     /// ```
     /// # use frust::*;
     /// # let mut ctx = Context::new_null();
-    /// # ctx.dictionary.add("+", Cell::Call(builtins::plus));
-    /// # ctx.dictionary.add(".", Cell::Call(builtins::dot));
+    /// # ctx.dictionary.add("+", Cell::Exec(builtins::plus));
+    /// # ctx.dictionary.add(".", Cell::Exec(builtins::dot));
     /// ctx.eval("5 4 + . ");
     /// ```
     pub fn eval(&mut self, input: &str) -> Result<()> {

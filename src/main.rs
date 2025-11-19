@@ -2,54 +2,50 @@ use frust::*;
 
 fn main() {
     let mut ctx = Context::new_stdio();
-    ctx.dictionary.add("+", Cell::Call(builtins::plus));
-    ctx.dictionary.add("-", Cell::Call(builtins::minus));
-    ctx.dictionary.add("*", Cell::Call(builtins::times));
-    ctx.dictionary.add("/", Cell::Call(builtins::div));
-    ctx.dictionary.add("mod", Cell::Call(builtins::modulo));
-    ctx.dictionary.add("\\", Cell::Call(builtins::lcomment));
-    ctx.dictionary.add("(", Cell::Call(builtins::icomment));
-    ctx.dictionary.add(".", Cell::Call(builtins::dot));
-    ctx.dictionary.add("dup", Cell::Call(builtins::dup));
-    ctx.dictionary.add(".s", Cell::Call(builtins::dot_s));
-    ctx.dictionary.add("abs", Cell::Call(builtins::abs));
-    ctx.dictionary.add("=", Cell::Call(builtins::eq));
-    ctx.dictionary.add("max", Cell::Call(builtins::max));
-    ctx.dictionary.add("min", Cell::Call(builtins::min));
-    ctx.dictionary.add("nip", Cell::Call(builtins::nip));
+    ctx.dictionary.add("+", Cell::Exec(builtins::plus));
+    ctx.dictionary.add("-", Cell::Exec(builtins::minus));
+    ctx.dictionary.add("*", Cell::Exec(builtins::times));
+    ctx.dictionary.add("/", Cell::Exec(builtins::div));
+    ctx.dictionary.add("mod", Cell::Exec(builtins::modulo));
+    ctx.dictionary.add("\\", Cell::Exec(builtins::lcomment));
+    ctx.dictionary.add("(", Cell::Exec(builtins::icomment));
+    ctx.dictionary.add(".", Cell::Exec(builtins::dot));
+    ctx.dictionary.add("cr", Cell::Exec(builtins::cr));
+    ctx.dictionary.add("space", Cell::Exec(builtins::space));
+    ctx.dictionary.add("1-", Cell::Exec(builtins::one_minus));
+    ctx.dictionary.add("dup", Cell::Exec(builtins::dup));
+    ctx.dictionary.add(".s", Cell::Exec(builtins::dot_s));
+    ctx.dictionary.add("abs", Cell::Exec(builtins::abs));
+    ctx.dictionary.add("=", Cell::Exec(builtins::eq));
+    ctx.dictionary.add("max", Cell::Exec(builtins::max));
+    ctx.dictionary.add("min", Cell::Exec(builtins::min));
+    ctx.dictionary.add("nip", Cell::Exec(builtins::nip));
     ctx.dictionary
-        .add("roll", Cell::Call(builtins::unimplemented));
+        .add("roll", Cell::Exec(builtins::unimplemented));
     ctx.dictionary
-        .add("pick", Cell::Call(builtins::unimplemented));
-    ctx.dictionary.add("over", Cell::Call(builtins::over));
-    ctx.dictionary.add("tuck", Cell::Call(builtins::tuck));
-    ctx.dictionary.add("negate", Cell::Call(builtins::negate));
-    ctx.dictionary.add("dup", Cell::Call(builtins::dup));
-    ctx.dictionary.add("swap", Cell::Call(builtins::swap));
-    ctx.dictionary.add("rot", Cell::Call(builtins::rot));
-    ctx.dictionary.add("drop", Cell::Call(builtins::drop));
-    ctx.dictionary.add("?dup", Cell::Call(builtins::qdup));
-
-    ctx.dictionary.add(
-        "if",
-        Cell::Compiled(builtins::runtime_if, builtins::compiletime_if),
-    );
-    ctx.dictionary.add("else", Cell::Label("ELSE".to_owned()));
-    ctx.dictionary.add("then", Cell::Label("THEN".to_owned()));
-
-    ctx.dictionary.add(
-        ".\"",
-        Cell::Compiled(builtins::runtime_dot_q, builtins::compiletime_dot_q),
-    );
+        .add("pick", Cell::Exec(builtins::unimplemented));
+    ctx.dictionary.add("over", Cell::Exec(builtins::over));
+    ctx.dictionary.add("tuck", Cell::Exec(builtins::tuck));
+    ctx.dictionary.add("negate", Cell::Exec(builtins::negate));
+    ctx.dictionary.add("dup", Cell::Exec(builtins::dup));
+    ctx.dictionary.add("swap", Cell::Exec(builtins::swap));
+    ctx.dictionary.add("rot", Cell::Exec(builtins::rot));
+    ctx.dictionary.add("drop", Cell::Exec(builtins::drop));
+    ctx.dictionary.add("?dup", Cell::Exec(builtins::qdup));
+    ctx.dictionary.add("i", Cell::Exec(builtins::i));
+    ctx.dictionary.add("j", Cell::Exec(builtins::j));
+    ctx.dictionary
+        .add("if", Cell::Compiled(builtins::compiletime_if));
+    ctx.dictionary
+        .add("do", Cell::Compiled(builtins::compiletime_do));
+    ctx.dictionary
+        .add(".\"", Cell::Compiled(builtins::compiletime_dot_q));
 
     loop {
         let mut buffer = String::new();
-        match (ctx.read)(&mut buffer) {
+        let _ = match (ctx.read)(&mut buffer) {
             Ok(0) => break,
-            Ok(_) => match ctx.eval(&buffer) {
-                Ok(()) => (ctx.write)("ok"),
-                Err(v) => (ctx.write)(&format!("??? {:?}", v)),
-            },
+            Ok(_) => ctx.eval(&buffer),
             Err(_) => break,
         };
     }

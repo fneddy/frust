@@ -14,11 +14,11 @@ use crate::Context;
 /// # use frust::builtins::unimplemented;
 /// # let mut empty = VecDeque::new();
 /// let mut ctx = Context::new_null();
-/// assert_eq!(unimplemented(&mut ctx, &mut empty), Err(Error::Unimplemented));
+/// assert_eq!(unimplemented(&mut ctx, &mut empty), Err(Error::Unimplemented("Function".to_owned())));
 ///
 /// ```
-pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    Err(Error::Unimplemented)
+pub fn unimplemented(_: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+    Err(Error::Unimplemented("Function".to_owned()))
 }
 
 /// forth `dot` command `.`
@@ -30,17 +30,20 @@ pub fn unimplemented(_ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Resu
 ///
 /// ```
 /// # use frust::*;
+/// # use std::sync::mpsc::channel;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::dot;
 /// # let mut empty = VecDeque::new();
-/// # let mut ctx = Context::new_null();
+/// # let (test_writer, test_stdout) = channel();
+/// let mut ctx = Context::new_null();
+/// # ctx.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
+/// 
 /// ctx.value_stack.push(23);
-/// let _ = dot(&mut ctx, &mut empty);
-/// let _ = dot(&mut ctx, &mut empty);
-///
-/// // expected output:
-/// // 23
-/// // Stack error
+/// 
+/// assert_eq!(dot(&mut ctx, &mut empty),Ok(()));
+/// assert_eq!(test_stdout.recv().unwrap(), "23");
+/// 
+/// assert_eq!(dot(&mut ctx, &mut empty), Err(Error::Stack));
 ///
 /// ```
 pub fn dot(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
@@ -500,7 +503,7 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
             return Ok(());
         }
     }
-    Err(Error::Parser)
+    Err(Error::Parser("EOL".to_owned()))
 }
 
 /// forth `negate` command
@@ -616,6 +619,32 @@ pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
     Ok(())
 }
 
+/// forth `space` command
+///
+/// https://forth-standard.org/standard/core/SPACE
+/// 
+/// prints ` ` to write
+pub fn space(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+    (ctx.write)(&format!(" "));
+    Ok(())
+}
+
+/// forth `1-` command
+///
+/// https://forth-standard.org/standard/core/OneMinus
+/// 
+/// prints ` ` to write
+pub fn one_minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+     if let Ok(v) = ctx.value_stack.at_mut(0) {
+        match v {
+            Variable::Int(v) => *v = *v - 1,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+
 /// forth `?dup` command
 ///
 /// https://forth-standard.org/standard/core/qDUP
@@ -627,5 +656,28 @@ pub fn qdup(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
             ctx.value_stack.push(v.clone());
         }
     }
+    Ok(())
+}
+
+/// forth `I` command
+///
+/// https://forth-standard.org/standard/core/I
+///
+///
+pub fn i(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+    let idx = ctx.return_stack.at(0)?;
+    ctx.value_stack.push(idx);
+    Ok(())
+}
+
+
+/// forth `J` command
+///
+/// https://forth-standard.org/standard/core/J
+///
+///
+pub fn j(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+    let idx = ctx.return_stack.at(1)?;
+    ctx.value_stack.push(idx);
     Ok(())
 }
