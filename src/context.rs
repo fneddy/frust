@@ -1,13 +1,17 @@
-use crate::{Cell, Dictionary, Error, Result, Stack, Variable};
-use std::{collections::VecDeque, io::{BufRead, Write}, mem};
+use crate::{Cell, Dictionary, Error, Result, Stack, Variable, builtins::dot_s};
+use std::{
+    collections::VecDeque,
+    io::{BufRead, Write},
+    mem,
+};
 
 #[derive(Debug, Default)]
 pub enum State {
     #[default]
     Taken,
     Interpret,
-    FIllBuffer(VecDeque<String>),
-    Compile(VecDeque<String>),
+    FIllBuffer,
+    Compile,
 }
 
 impl State {
@@ -15,14 +19,14 @@ impl State {
         match &self {
             State::Taken => true,
             State::Interpret => true,
-            State::FIllBuffer(_) => true,
-            State::Compile(_) => false,
+            State::FIllBuffer => true,
+            State::Compile => false,
         }
     }
 }
 
 /// Complete context of the forth env
-pub struct Context {
+pub struct VM {
     pub value_stack: Stack,
     pub return_stack: Stack,
     pub dictionary: Dictionary,
@@ -30,24 +34,25 @@ pub struct Context {
     pub read: Box<dyn Fn(&mut String) -> std::io::Result<usize>>,
     pub state: State,
     pub handle_errors: bool,
+    pub input_buffer: VecDeque<String>,
 }
 
-impl Context {
+impl VM {
     /// Create a new context and bind
     /// input - `stdin`
     /// output - `stdout`
     /// ```no_run
-    /// # use frust::Context;
-    /// let ctx = Context::new_stdio();
+    /// # use frust::VM;
+    /// let vm = VM::new_stdio();
     ///
     /// /// read data from stdin
     /// let mut buffer = String::new();
-    /// (ctx.read)(&mut buffer);
+    /// (vm.read)(&mut buffer);
     ///
     /// /// write data to stdout
-    /// (ctx.write)(&buffer);
+    /// (vm.write)(&buffer);
     /// ```
-    pub fn new_stdio() -> Context {
+    pub fn new_stdio() -> VM {
         Self::new(
             |buf| {
                 let stdin = std::io::stdin();
@@ -65,25 +70,25 @@ impl Context {
     /// output - `null`
     ///
     /// ```
-    /// # use frust::Context;
-    /// let ctx = Context::new_null();
+    /// # use frust::VM;
+    /// let vm = VM::new_null();
     ///
     /// /// read nothing
     /// let mut buffer = String::new();
-    /// (ctx.read)(&mut buffer);
+    /// (vm.read)(&mut buffer);
     ///
     /// /// write nothing
-    /// (ctx.write)(&buffer);
+    /// (vm.write)(&buffer);
     /// ```
-    pub fn new_null() -> Context {
+    pub fn new_null() -> VM {
         Self::new(|_| Ok(0), |_| {})
     }
 
-    /// Create a new forth Context
+    /// Create a new forth VM
     /// `read` - global user input function
     /// `write` - global write to user function
-    pub fn new(read: fn(&mut String) -> std::io::Result<usize>, write: fn(&str)) -> Context {
-        Context {
+    pub fn new(read: fn(&mut String) -> std::io::Result<usize>, write: fn(&str)) -> VM {
+        VM {
             value_stack: Stack::new(),
             return_stack: Stack::new(),
             dictionary: Dictionary::new(),
@@ -91,58 +96,120 @@ impl Context {
             read: Box::new(read),
             state: State::Interpret,
             handle_errors: true,
+            input_buffer: VecDeque::new(),
         }
     }
 
-    /// Split the input into tokens by forth rules
-    /// ```ignore
-    /// # use frust::Context;
-    /// let input = " This is an example for some_forth input";
-    /// let tokens = Context::tokenize(input);
-    /// assert_eq!("This", tokens.pop_front());
-    /// ```
-    fn tokenize(input: &str) -> VecDeque<String> {
-        input
-            .split_whitespace()
-            .map(|token| token.to_owned())
-            .collect()
+
+    // actual "compilation" step
+    pub fn compile(&mut self) -> Result<Vec<Cell>> {
+        let mut function: Vec<Cell> = Vec::new();
+        while let Some(token) = self.input_buffer.pop_front() {
+            if token == ";" {
+                return Ok(function);
+            }
+            // if this is a valid word from our dictionary
+            // add this to the function to be callable later
+            if let Ok(routine) = self.dictionary.get(&token) {
+                if routine.len() == 1 {
+                    for word in routine {
+                        match word {
+                            Cell::Compiler(ct_func) => {
+                                function.append(&mut ct_func(self)?);
+                                break;
+                            }
+                            _ => function.push(word),
+                        }
+                    }
+                } else {
+                    function.push(Cell::Call(token.clone()));
+                }
+            }
+            // try to parse the input as a numeric value
+            // this is not std conform we should read `BASE` variable that indicates
+            // the radix (2-10-16)
+            else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
+                function.push(Cell::Data(Variable::Int(value)).into());
+            }
+            // unknown token,
+            // maybe an error or just a token we are not supposed to compile
+            else {
+                return Err(Error::Compiler(function, token));
+            }
+        }
+        Err(Error::Compiler(function, "EOL".to_owned()))
+    }
+
+    /// transition the compilation state
+    fn state_compile(&mut self) -> Result<State> {
+        let _ = self.input_buffer.pop_front(); // pop the leading`:`
+
+        if let Some(name) = self.input_buffer.pop_front() {
+            let function = self.compile()?;
+
+            self.dictionary.add(&name.to_lowercase(), function);
+        }
+        Ok(State::Interpret)
     }
 
     /// executes an entry from the dictionary
-    pub fn execute(&mut self, function: Cell, tokens: &mut VecDeque<String>) -> Result<()> {
-        match function {
-            Cell::Exec(func) => func(self, tokens),
-            Cell::Call(name) => self.execute(self.dictionary.get(&name)?, tokens),
-            Cell::Routine(functions) => functions
-                .iter()
-                .map(|function| self.execute(function.clone(), tokens))
-                .collect(),
-            Cell::Compiled(_) => Err(Error::Unimplemented("Compiletime function".to_owned())),
-            Cell::Branch(rt_function, _) => rt_function(self, tokens),
-            Cell::Data(data) => {
-                self.value_stack.push(data);
-                Ok(())
-            }
-            Cell::ControlReturn => Ok(()),
+    pub fn execute(&mut self, program: Vec<Cell>) -> Result<()> {
+        let mut pc = 0i64;
+        //println!("execute: {:?}", program);
+        while pc < program.len() as i64 {
+            let word = program.get(pc as usize).ok_or(Error::Executor)?.clone();
+
+            //println!("pc({})>word({:?})",pc,word);
+            let mut next_step = 1i64;
+            match word {
+                Cell::Exec(func) => func(self)?,
+                Cell::Compiled(func) => func(self)?,
+                Cell::Call(name) => self.execute(self.dictionary.get(&name)?)?,
+                Cell::Data(data) => self.value_stack.push(data),
+                Cell::ControlReturn => {
+                    return Ok(());
+                }
+                Cell::ControlBranch => {
+                    next_step = self.value_stack.pop()?.into();
+                }
+                Cell::ControlBranchIfZero => {
+                    let branch_step: i64 = self.value_stack.pop()?.into();
+                    let branch_check = self.value_stack.pop()?;
+                    if branch_check == Variable::Int(0) {
+                        next_step = branch_step;
+                    }
+                }
+                Cell::ControlBranchIfNotZero => {
+                    let branch_step: i64 = self.value_stack.pop()?.into();
+                    let branch_check = self.value_stack.pop()?;
+                    if branch_check != Variable::Int(0) {
+                        next_step = branch_step;
+                    }
+                }
+                Cell::Compiler(_) => {
+                    return Err(Error::Parser("Interpreting a compile-only word".to_owned()));
+                }
+            };
+            //dot_s(self);
+            pc += next_step;
         }
+        Ok(())
     }
 
     /// interpret forth tokens
-    fn state_interpret(&mut self, tokens: &mut VecDeque<String>) -> Result<State> {
+    fn state_interpret(&mut self) -> Result<State> {
         // : indicates start of compilation.
         // we switch to input buffering until we see ;
         // so we can compile the complete function in one go
-        if tokens.front() == Some(&":".to_owned()) {
-            return self.state_fill_buffer(VecDeque::new(), tokens);
+        if self.input_buffer.front() == Some(&":".to_owned()) {
+            return self.state_fill_buffer();
         }
 
         // interprete all input token by token
-        while let Some(token) = tokens.pop_front() {
+        while let Some(token) = self.input_buffer.pop_front() {
             // is this token a word from the dictionary we execute it
             if let Ok(word) = self.dictionary.get(&token) {
-                if let Err(error) = self.execute(word, tokens) {
-                    return Err(error);
-                }
+                self.execute(word)?;
             }
             // try to parse the input as a numeric value
             // this is not std conform we should read `BASE` variable that indicates
@@ -159,66 +226,13 @@ impl Context {
         Ok(State::Interpret)
     }
 
-    // actual "compilation" step
-    pub fn compile(&mut self, tokens: &mut VecDeque<String>) -> Result<Cell> {
-        let mut function: Vec<Cell> = Vec::new();
-        while let Some(token) = tokens.pop_front() {
-            // if this is a valid word from our dictionary
-            // add this to the function to be callable later
-            if let Ok(word) = self.dictionary.get(&token) {
-                match word {
-                    Cell::Compiled(ct_func) => function.push(ct_func(self, tokens)?),
-                    Cell::Routine(_) => function.push(Cell::Call(token)),
-                    _ => function.push(word),
-                }
-            }
-            // try to parse the input as a numeric value
-            // this is not std conform we should read `BASE` variable that indicates
-            // the radix (2-10-16)
-            else if let Ok(value) = std::primitive::i64::from_str_radix(&token, 10) {
-                function.push(Cell::Data(Variable::Int(value)).into());
-            }
-            // unknown token,
-            // maybe an error or just a token we are not supposed to compile
-            else {
-                return Err(Error::Compiler(Cell::Routine(function), token));
-            }
-        }
-        Ok(Cell::Routine(function))
-    }
-
-    /// transition the compilation state
-    fn state_compile(&mut self, mut tokens: VecDeque<String>) -> Result<State> {
-        let _ = tokens.pop_front(); // pop the leading`:`
-
-        if let Some(name) = tokens.pop_front() {
-            let function = self.compile(&mut tokens)?;
-
-            self.dictionary.add(&name.to_lowercase(), function);
-        }
-        Ok(State::Interpret)
-    }
-
     /// stays in fill buffer state until it sees a ';'
-    fn state_fill_buffer(
-        &mut self,
-        mut buffer: VecDeque<String>,
-        tokens: &mut VecDeque<String>,
-    ) -> Result<State> {
-        while let Some(token) = tokens.pop_front() {
-            // ; indicates end of compilation
-            // we switch over to interpreter mode
-            // and hand over the rest of the input
-            if token == ";" {
-                return Ok(State::Compile(buffer));
-            }
-            // add all other token to the input
-            else {
-                buffer.push_back(token.to_owned());
-            }
+    fn state_fill_buffer(&mut self) -> Result<State> {
+        if self.input_buffer.contains(&";".to_owned()) {
+            return Ok(State::Compile);
+        } else {
+            return Ok(State::FIllBuffer);
         }
-
-        return Ok(State::FIllBuffer(buffer));
     }
 
     /// prints error message and resets state machine if wanted
@@ -235,20 +249,21 @@ impl Context {
     /// automatically switch between interpreter and compiler
     /// ```
     /// # use frust::*;
-    /// # let mut ctx = Context::new_null();
-    /// # ctx.dictionary.add("+", Cell::Exec(builtins::plus));
-    /// # ctx.dictionary.add(".", Cell::Exec(builtins::dot));
-    /// ctx.eval("5 4 + . ");
+    /// # let mut vm = VM::new_null();
+    /// # vm.dictionary.add("+", Cell::Exec(builtins::plus));
+    /// # vm.dictionary.add(".", Cell::Exec(builtins::dot));
+    /// vm.eval("5 4 + . ");
     /// ```
     pub fn eval(&mut self, input: &str) -> Result<()> {
-        let tokens = &mut Self::tokenize(input);
+        self.input_buffer
+            .extend(input.split_whitespace().map(|token| token.to_owned()));
 
-        while !tokens.is_empty() || !self.state.is_idling() {
+        while !self.input_buffer.is_empty() || !self.state.is_idling() {
             let new_state = match mem::take(&mut self.state) {
                 State::Taken => Ok(State::Interpret),
-                State::Interpret => self.state_interpret(tokens),
-                State::FIllBuffer(buffer) => self.state_fill_buffer(buffer, tokens),
-                State::Compile(buffer) => self.state_compile(buffer),
+                State::Interpret => self.state_interpret(),
+                State::FIllBuffer => self.state_fill_buffer(),
+                State::Compile => self.state_compile(),
             };
             match new_state {
                 Ok(state) => self.state = state,

@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::{ fmt::{Debug, Display}};
 
 use crate::Cell;
 
@@ -8,12 +8,13 @@ use crate::Cell;
 /// TODO: test
 #[derive(PartialEq)]
 pub enum Error {
-    Compiler(Cell,String),
+    Compiler(Vec<Cell>,String),
     Executor,
     Parser(String),
     Stack,
     Type,
     Unimplemented(String),
+    Prev(Vec<Error>)
 }
 pub type Result<T> = std::result::Result<T, Error>;
 impl Display for Error {
@@ -30,6 +31,7 @@ impl Debug for Error {
             Error::Stack => write!(f, "Stack"),
             Error::Type => write!(f, "Type"),
             Error::Unimplemented(name) => write!(f, "Unimplemented({:?})",name),
+            Error::Prev(other) => write!(f,"[{:?}]",other),
         }
     }
 }

@@ -1,7 +1,4 @@
-use std::collections::VecDeque;
-
 use crate::*;
-
 
 /// forth `if` command compiletime evaluation
 ///
@@ -9,47 +6,60 @@ use crate::*;
 ///
 /// ```
 /// # use frust::*;
+/// # use std::time::Duration;
 /// # use std::sync::mpsc::channel;
 /// # let (test_writer, test_stdout) = channel();
-/// let mut ctx = Context::new_null();
-/// # ctx.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
+/// let mut vm = VM::new_null();
+/// # vm.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
 ///
-/// ctx.dictionary.add("if",Cell::Compiled(builtins::compiletime_if));
-/// ctx.dictionary.add(".\"",Cell::Compiled(builtins::compiletime_dot_q));
-/// ctx.dictionary.add(".", Cell::Exec(builtins::dot));
+/// vm.dictionary.add("if",Cell::Compiler(builtins::compiletime_if));
+/// vm.dictionary.add(".\"",Cell::Compiler(builtins::compiletime_dot_q));
+/// vm.dictionary.add(".", Cell::Exec(builtins::dot));
 ///
-/// ctx.eval(": foo IF . ELSE .\" No more \" THEN ; ");
-/// ctx.eval(" 1 foo foo ");
-/// assert_eq!(test_stdout.recv().unwrap(), "1 No more");
-/// ```
-pub fn compiletime_if(ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<Cell> {
-    let mut branches = Vec::new();
+/// vm.eval(": foo IF . ELSE .\" No more \" THEN ; ");
+/// vm.eval(" 1 1 foo ");
+/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "1");
+/// vm.eval(" 0 foo ");
+/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "no more");
 
-    while let Err(Error::Compiler(branch,token)) = ctx.compile(tokens) {
-        branches.push(branch);
-        match token.to_lowercase().as_str() {
-            "then" => break,
-            "else" => continue,
-            _ => return Err(Error::Compiler(Cell::Branch(runtime_if, branches), token)),
+/// ```
+pub fn compiletime_if(vm: &mut VM) -> Result<Vec<Cell>> {
+    let mut branch_true: Vec<Cell> = Vec::new();
+    let mut branch_false: Vec<Cell> = Vec::new();
+    let mut next_token = String::new();
+
+    if let Err(Error::Compiler(branch, token)) = vm.compile() {
+        branch_true = branch;
+        next_token = token.to_lowercase();
+    }
+
+    if next_token == "else" {
+        if let Err(Error::Compiler(branch, token)) = vm.compile() {
+            branch_false = branch;
+            next_token = token.to_lowercase();
         }
     }
 
-    Ok(Cell::Branch(runtime_if, branches))
+    if next_token == "then" {
+        let program: Vec<Cell> = vec![
+            Cell::Data(Variable::Int(branch_true.len() as i64 + 3)),
+            Cell::ControlBranchIfZero,
+        ]
+        .into_iter()
+        .chain(branch_true.into_iter())
+        .chain(
+            vec![
+                Cell::Data(Variable::Int(branch_false.len() as i64 + 1)),
+                Cell::ControlBranch,
+            ]
+            .into_iter(),
+        )
+        .chain(branch_false.into_iter())
+        .collect();
+        return Ok(program);
+    }
+    Err(Error::Compiler(vec![], next_token))
 }
-
-pub fn runtime_if(_ctx: &mut Context, _tokens: &mut VecDeque<String>) -> Result<()> {
-    //let condition = ctx.value_stack.pop()?;
-    //if let Cell::Branch(_,branch) = cell {
-    //    if condition == Variable::from(0) && let Some(function) = branch.get(0) {
-    //        ctx.execute(function.clone(), tokens)?
-    //    }
-    //    else if let Some(function) = branch.get(1) {
-    //        ctx.execute(function.clone(), tokens)?
-    //    }
-    //}
-    Ok(())
-}
-
 
 /// forth `."` command compiletime evaluation
 ///
@@ -61,28 +71,29 @@ pub fn runtime_if(_ctx: &mut Context, _tokens: &mut VecDeque<String>) -> Result<
 ///
 /// ```
 /// # use frust::*;
+/// # use std::time::Duration;
 /// # use std::sync::mpsc::channel;
 /// # let (test_writer, test_stdout) = channel();
-/// let mut ctx = Context::new_null();
-/// # ctx.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
+/// let mut vm = VM::new_null();
+/// # vm.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
 ///
-/// ctx.dictionary.add(".\"",Cell::Compiled(builtins::compiletime_dot_q));
-/// ctx.dictionary.add(".", Cell::Exec(builtins::dot));
-/// ctx.dictionary.add("+", Cell::Exec(builtins::plus));
+/// vm.dictionary.add(".\"",Cell::Compiler(builtins::compiletime_dot_q));
+/// vm.dictionary.add(".", Cell::Exec(builtins::dot));
+/// vm.dictionary.add("+", Cell::Exec(builtins::plus));
 ///
-/// ctx.eval(": foo .\" bar baz \" 1 1 + ; ");
-/// ctx.eval(" foo ");
-/// assert_eq!(test_stdout.recv().unwrap(), "bar baz");
-/// ctx.eval(" . ");
-/// assert_eq!(test_stdout.recv().unwrap(), "2");
+/// vm.eval(": foo .\" bar baz \" 1 1 + ; ");
+/// vm.eval(" foo ");
+/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "bar baz");
+/// vm.eval(" . ");
+/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "2");
 /// ```
-pub fn compiletime_dot_q(_ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<Cell> {
+pub fn compiletime_dot_q(vm: &mut VM) -> Result<Vec<Cell>> {
     let mut buffer = String::new();
-    while let Some(token) = tokens.pop_front() {
+    while let Some(token) = vm.input_buffer.pop_front() {
         if token.ends_with("\"") {
             let comment = Cell::Data(Variable::from(buffer.as_str()));
             let entry = Cell::Exec(runtime_dot_q);
-            return Ok(Cell::Routine(vec![comment, entry]));
+            return Ok(vec![comment, entry]);
         }
         if buffer.len() > 0 {
             buffer.push_str(" ");
@@ -92,12 +103,11 @@ pub fn compiletime_dot_q(_ctx: &mut Context, tokens: &mut VecDeque<String>) -> R
     return Err(Error::Parser("EOL".to_owned()));
 }
 
-pub fn runtime_dot_q(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let comment = ctx.value_stack.pop()?;
-    (ctx.write)(&format!("{}", comment));
+pub fn runtime_dot_q(vm: &mut VM) -> Result<()> {
+    let comment = vm.value_stack.pop()?;
+    (vm.write)(&format!("{}", comment));
     Ok(())
 }
-
 
 /// forth `DO"` command compiletime evaluation
 ///
@@ -108,50 +118,46 @@ pub fn runtime_dot_q(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> 
 /// # use frust::*;
 /// # use std::sync::mpsc::channel;
 /// # let (test_writer, test_stdout) = channel();
-/// let mut ctx = Context::new_null();
-/// # ctx.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
+/// let mut vm = VM::new_null();
+/// # vm.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
 ///
-/// ctx.dictionary.add(".\"",Cell::Compiled(builtins::compiletime_dot_q));
-/// ctx.dictionary.add(".", Cell::Exec(builtins::dot));
-/// ctx.dictionary.add("+", Cell::Exec(builtins::plus));
+/// vm.dictionary.add(".\"",Cell::Compiler(builtins::compiletime_dot_q));
+/// vm.dictionary.add(".", Cell::Exec(builtins::dot));
+/// vm.dictionary.add("+", Cell::Exec(builtins::plus));
 ///
 /// ```
-pub fn compiletime_do(ctx: &mut Context, tokens: &mut VecDeque<String>) -> Result<Cell> {
+pub fn compiletime_do(vm: &mut VM) -> Result<Vec<Cell>> {
     let mut branches = Vec::new();
-    let compiled =  ctx.compile(tokens);
-    if let Err(Error::Compiler(branch,token)) = compiled {
-        branches.push(branch);
+    let compiled = vm.compile();
+    if let Err(Error::Compiler(branch, token)) = compiled {
+        branches.extend(branch);
         match token.to_lowercase().as_str() {
-            "loop" => return Ok(Cell::Branch(runtime_loop, branches)),
-            "+loop" => return Ok(Cell::Branch(runtime_plus_loop, branches)),
-            "-loop" => return Ok(Cell::Branch(runtime_minus_loop, branches)),
-            _ => return Err(Error::Compiler(Cell::Branch(runtime_if, branches), token)),
+            //"loop" => return Ok(Cell::Branch(runtime_loop, branches)),
+            //"+loop" => return Ok(Cell::Branch(runtime_plus_loop, branches)),
+            //"-loop" => return Ok(Cell::Branch(runtime_minus_loop, branches)),
+            _ => return Err(Error::Compiler(branches, token)),
         }
-    }
-    else {
-        return Err(Error::Compiler(compiled?, "EOL".to_owned()))
+    } else {
+        return Err(Error::Compiler(compiled?, "EOL".to_owned()));
     };
-
 }
 
-pub fn runtime_do(_ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+pub fn runtime_do(_vm: &mut VM) -> Result<()> {
     println!("runtime_do");
     Ok(())
 }
 
-pub fn runtime_loop(_ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+pub fn runtime_loop(_vm: &mut VM) -> Result<()> {
     println!("runtime_loop");
     Ok(())
 }
 
-pub fn runtime_plus_loop(_ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+pub fn runtime_plus_loop(_vm: &mut VM) -> Result<()> {
     println!("runtime_plus_loop");
     Ok(())
 }
 
-pub fn runtime_minus_loop(_ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+pub fn runtime_minus_loop(_vm: &mut VM) -> Result<()> {
     println!("runtime_minus_loop");
     Ok(())
 }
-
-

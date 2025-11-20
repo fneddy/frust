@@ -105,3 +105,12 @@ impl std::ops::Rem for Variable {
         };
     }
 }
+impl Into<i64> for Variable {
+    fn into(self) -> i64 {
+        match self {
+            Variable::Array(variables) => variables.len() as i64,
+            Variable::String(value) => value.len() as i64,
+            Variable::Int(value) => value,
+        }
+    }
+}

@@ -1,12 +1,10 @@
-use std::collections::VecDeque;
-
 use crate::Result;
+use crate::VM;
 
-use crate::Context;
-
-pub fn dot_s(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    for value in ctx.value_stack.iter() {
-        (ctx.write)(&format!("{}", value));
+pub fn dot_s(vm: &mut VM) -> Result<()> {
+    for value in vm.value_stack.iter() {
+        (vm.write)(&format!(" {} ", value));
     }
+    (vm.write)(&format!("\n"));
     Ok(())
 }

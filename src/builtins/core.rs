@@ -1,8 +1,6 @@
-use std::collections::VecDeque;
-
 use crate::{Error, Result, Variable};
 
-use crate::Context;
+use crate::VM;
 
 /// not a real forth command
 ///
@@ -12,12 +10,11 @@ use crate::Context;
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::unimplemented;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// assert_eq!(unimplemented(&mut ctx, &mut empty), Err(Error::Unimplemented("Function".to_owned())));
+/// let mut vm = VM::new_null();
+/// assert_eq!(unimplemented(&mut vm), Err(Error::Unimplemented("Function".to_owned())));
 ///
 /// ```
-pub fn unimplemented(_: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
+pub fn unimplemented(_: &mut VM) -> Result<()> {
     Err(Error::Unimplemented("Function".to_owned()))
 }
 
@@ -33,22 +30,21 @@ pub fn unimplemented(_: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use std::sync::mpsc::channel;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::dot;
-/// # let mut empty = VecDeque::new();
 /// # let (test_writer, test_stdout) = channel();
-/// let mut ctx = Context::new_null();
-/// # ctx.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
+/// let mut vm = VM::new_null();
+/// # vm.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
 /// 
-/// ctx.value_stack.push(23);
+/// vm.value_stack.push(23);
 /// 
-/// assert_eq!(dot(&mut ctx, &mut empty),Ok(()));
+/// assert_eq!(dot(&mut vm),Ok(()));
 /// assert_eq!(test_stdout.recv().unwrap(), "23");
 /// 
-/// assert_eq!(dot(&mut ctx, &mut empty), Err(Error::Stack));
+/// assert_eq!(dot(&mut vm), Err(Error::Stack));
 ///
 /// ```
-pub fn dot(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let v = ctx.value_stack.pop()?;
-    (ctx.write)(&format!("{}", v));
+pub fn dot(vm: &mut VM) -> Result<()> {
+    let v = vm.value_stack.pop()?;
+    (vm.write)(&format!("{}", v));
     Ok(())
 }
 
@@ -64,20 +60,19 @@ pub fn dot(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::plus;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(23);
-/// ctx.value_stack.push(42);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(23);
+/// vm.value_stack.push(42);
 ///
-/// plus(&mut ctx, &mut empty);
+/// plus(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(65)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(65)));
 ///
 /// ```
-pub fn plus(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a + b);
+pub fn plus(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a + b);
     Ok(())
 }
 
@@ -93,20 +88,19 @@ pub fn plus(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::minus;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(23);
-/// ctx.value_stack.push(42);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(23);
+/// vm.value_stack.push(42);
 ///
-/// minus(&mut ctx, &mut empty);
+/// minus(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-19)))
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(-19)))
 ///
 /// ```
-pub fn minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a - b);
+pub fn minus(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a - b);
     Ok(())
 }
 
@@ -122,20 +116,19 @@ pub fn minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::times;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(4);
-/// ctx.value_stack.push(3);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(4);
+/// vm.value_stack.push(3);
 ///
-/// times(&mut ctx, &mut empty);
+/// times(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(12)))
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(12)))
 ///
 /// ```
-pub fn times(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a * b);
+pub fn times(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a * b);
     Ok(())
 }
 
@@ -151,23 +144,22 @@ pub fn times(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::max;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(4);
-/// ctx.value_stack.push(3);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(4);
+/// vm.value_stack.push(3);
 ///
-/// max(&mut ctx, &mut empty);
+/// max(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(4)))
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(4)))
 ///
 /// ```
-pub fn max(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
+pub fn max(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
     if a > b {
-        ctx.value_stack.push(a);
+        vm.value_stack.push(a);
     } else {
-        ctx.value_stack.push(b);
+        vm.value_stack.push(b);
     }
     Ok(())
 }
@@ -184,23 +176,22 @@ pub fn max(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::min;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(4);
-/// ctx.value_stack.push(3);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(4);
+/// vm.value_stack.push(3);
 ///
-/// min(&mut ctx, &mut empty);
+/// min(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)))
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(3)))
 ///
 /// ```
-pub fn min(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
+pub fn min(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
     if a < b {
-        ctx.value_stack.push(a);
+        vm.value_stack.push(a);
     } else {
-        ctx.value_stack.push(b);
+        vm.value_stack.push(b);
     }
     Ok(())
 }
@@ -217,20 +208,19 @@ pub fn min(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::div;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(8);
-/// ctx.value_stack.push(2);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(8);
+/// vm.value_stack.push(2);
 ///
-/// div(&mut ctx, &mut empty);
+/// div(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(4)))
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(4)))
 ///
 /// ```
-pub fn div(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a / b);
+pub fn div(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a / b);
     Ok(())
 }
 
@@ -247,22 +237,21 @@ pub fn div(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::modulo;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(9);
-/// ctx.value_stack.push(2);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(9);
+/// vm.value_stack.push(2);
 ///
-/// modulo(&mut ctx, &mut empty);
+/// modulo(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(4)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(4)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 ///
 /// ```
-pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a.clone() % b.clone());
-    ctx.value_stack.push(a / b);
+pub fn modulo(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a.clone() % b.clone());
+    vm.value_stack.push(a / b);
     Ok(())
 }
 
@@ -276,21 +265,20 @@ pub fn modulo(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::dup;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(9);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(9);
 ///
-/// dup(&mut ctx, &mut empty);
+/// dup(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(9)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(9)));
 ///
 /// ```
 ///
-pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let value = ctx.value_stack.pop()?;
-    ctx.value_stack.push(value.clone());
-    ctx.value_stack.push(value);
+pub fn dup(vm: &mut VM) -> Result<()> {
+    let value = vm.value_stack.pop()?;
+    vm.value_stack.push(value.clone());
+    vm.value_stack.push(value);
     Ok(())
 }
 
@@ -303,22 +291,21 @@ pub fn dup(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::swap;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(9);
-/// ctx.value_stack.push(1);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(9);
+/// vm.value_stack.push(1);
 ///
-/// swap(&mut ctx, &mut empty);
+/// swap(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(9)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(9)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 ///
 /// ```
-pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let a = ctx.value_stack.pop()?;
-    let b = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a);
-    ctx.value_stack.push(b);
+pub fn swap(vm: &mut VM) -> Result<()> {
+    let a = vm.value_stack.pop()?;
+    let b = vm.value_stack.pop()?;
+    vm.value_stack.push(a);
+    vm.value_stack.push(b);
     Ok(())
 }
 
@@ -332,25 +319,24 @@ pub fn swap(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::rot;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(2);
-/// ctx.value_stack.push(3);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(2);
+/// vm.value_stack.push(3);
 ///
-/// rot(&mut ctx, &mut empty);
+/// rot(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(3)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(2)));
 /// ```
-pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let x3 = ctx.value_stack.pop()?;
-    let x2 = ctx.value_stack.pop()?;
-    let x1 = ctx.value_stack.pop()?;
-    ctx.value_stack.push(x2);
-    ctx.value_stack.push(x3);
-    ctx.value_stack.push(x1);
+pub fn rot(vm: &mut VM) -> Result<()> {
+    let x3 = vm.value_stack.pop()?;
+    let x2 = vm.value_stack.pop()?;
+    let x1 = vm.value_stack.pop()?;
+    vm.value_stack.push(x2);
+    vm.value_stack.push(x3);
+    vm.value_stack.push(x1);
     Ok(())
 }
 
@@ -367,21 +353,20 @@ pub fn rot(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::nip;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(2);
-/// ctx.value_stack.push(3);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(2);
+/// vm.value_stack.push(3);
 ///
-/// nip(&mut ctx, &mut empty);
+/// nip(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(3)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(3)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
-pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let value = ctx.value_stack.pop()?;
-    let _ = ctx.value_stack.pop()?;
-    ctx.value_stack.push(value);
+pub fn nip(vm: &mut VM) -> Result<()> {
+    let value = vm.value_stack.pop()?;
+    let _ = vm.value_stack.pop()?;
+    vm.value_stack.push(value);
     Ok(())
 }
 
@@ -395,24 +380,23 @@ pub fn nip(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::tuck;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(2);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(2);
 ///
-/// tuck(&mut ctx, &mut empty);
+/// tuck(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(2)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(2)));
 /// ```
 ///
-pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(b.clone());
-    ctx.value_stack.push(a);
-    ctx.value_stack.push(b);
+pub fn tuck(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(b.clone());
+    vm.value_stack.push(a);
+    vm.value_stack.push(b);
     Ok(())
 }
 
@@ -428,23 +412,22 @@ pub fn tuck(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::over;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(2);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(2);
 ///
-/// over(&mut ctx, &mut empty);
+/// over(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(2)));
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(2)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
-pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let b = ctx.value_stack.pop()?;
-    let a = ctx.value_stack.pop()?;
-    ctx.value_stack.push(a.clone());
-    ctx.value_stack.push(b);
-    ctx.value_stack.push(a);
+pub fn over(vm: &mut VM) -> Result<()> {
+    let b = vm.value_stack.pop()?;
+    let a = vm.value_stack.pop()?;
+    vm.value_stack.push(a.clone());
+    vm.value_stack.push(b);
+    vm.value_stack.push(a);
     Ok(())
 }
 
@@ -456,18 +439,17 @@ pub fn over(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use frust::*;
 /// # use std::collections::VecDeque;
 /// # use frust::builtins::drop;
-/// # let mut empty = VecDeque::new();
-/// let mut ctx = Context::new_null();
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(2);
+/// let mut vm = VM::new_null();
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(2);
 ///
-/// drop(&mut ctx, &mut empty);
+/// drop(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 /// ```
 ///
-pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let _ = ctx.value_stack.pop()?;
+pub fn drop(vm: &mut VM) -> Result<()> {
+    let _ = vm.value_stack.pop()?;
     Ok(())
 }
 
@@ -475,8 +457,8 @@ pub fn drop(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// - drops everything till end of line
 /// as we only process buffers line by line
 /// its save to just clear the complete buffer here
-pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()> {
-    buffer.clear();
+pub fn lcomment(vm: &mut VM) -> Result<()> {
+    vm.input_buffer.clear();
     Ok(())
 }
 
@@ -489,16 +471,16 @@ pub fn lcomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::icomment;
-/// let mut buffer: VecDeque<String>  = vec!["this".to_owned(), "is".to_owned(), "a".to_owned(), "tokenized".to_owned(), "comment)".to_owned(), "forth_code".to_owned()].into();
-/// let mut ctx = Context::new_null();
+/// let mut vm = VM::new_null();
+/// vm.input_buffer = vec!["this".to_owned(), "is".to_owned(), "a".to_owned(), "tokenized".to_owned(), "comment)".to_owned(), "forth_code".to_owned()].into();
 ///
-/// icomment(&mut ctx, &mut buffer);
+/// icomment(&mut vm);
 ///
-/// assert_eq!(buffer.pop_front(), Some("forth_code".to_owned()));
+/// assert_eq!(vm.input_buffer.pop_front(), Some("forth_code".to_owned()));
 ///
 /// ```
-pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()> {
-    while let Some(v) = buffer.pop_front() {
+pub fn icomment(vm: &mut VM) -> Result<()> {
+    while let Some(v) = vm.input_buffer.pop_front() {
         if v.ends_with(")") {
             return Ok(());
         }
@@ -517,18 +499,18 @@ pub fn icomment(_ctx: &mut Context, buffer: &mut VecDeque<String>) -> Result<()>
 /// # use frust::*;
 /// # use frust::builtins::negate;
 /// # let mut empty: VecDeque<String>  = vec![].into();
-/// let mut ctx = Context::new_null();
+/// let mut vm = VM::new_null();
 ///
-/// ctx.value_stack.push(Variable::Int(1));
+/// vm.value_stack.push(Variable::Int(1));
 ///
-/// negate(&mut ctx, &mut empty);
+/// negate(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(-1)));
 ///
 /// ```
 ///
-pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    if let Ok(v) = ctx.value_stack.at_mut(0) {
+pub fn negate(vm: &mut VM) -> Result<()> {
+    if let Ok(v) = vm.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = *v * -1,
             _ => {}
@@ -550,32 +532,31 @@ pub fn negate(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::eq;
-/// # let mut empty: VecDeque<String>  = vec![].into();
-/// let mut ctx = Context::new_null();
+/// let mut vm = VM::new_null();
 ///
-/// ctx.value_stack.push(1);
-/// ctx.value_stack.push(1);
+/// vm.value_stack.push(1);
+/// vm.value_stack.push(1);
 ///
-/// eq(&mut ctx, &mut empty);
+/// eq(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(-1)));
 ///
-/// ctx.value_stack.push(Variable::String("foo".into()));
-/// ctx.value_stack.push(Variable::String("foo".into()));
+/// vm.value_stack.push(Variable::String("foo".into()));
+/// vm.value_stack.push(Variable::String("foo".into()));
 ///
-/// eq(&mut ctx, &mut empty);
+/// eq(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(-1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(-1)));
 ///
 /// ```
 ///
-pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    let a = ctx.value_stack.pop()?;
-    let b = ctx.value_stack.pop()?;
+pub fn eq(vm: &mut VM) -> Result<()> {
+    let a = vm.value_stack.pop()?;
+    let b = vm.value_stack.pop()?;
     if a == b {
-        ctx.value_stack.push(Variable::Int(-1));
+        vm.value_stack.push(Variable::Int(-1));
     } else {
-        ctx.value_stack.push(Variable::Int(0));
+        vm.value_stack.push(Variable::Int(0));
     }
     Ok(())
 }
@@ -591,18 +572,17 @@ pub fn eq(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// # use std::collections::VecDeque;
 /// # use frust::*;
 /// # use frust::builtins::abs;
-/// # let mut empty: VecDeque<String>  = vec![].into();
-/// let mut ctx = Context::new_null();
+/// let mut vm = VM::new_null();
 ///
-/// ctx.value_stack.push(Variable::Int(-1));
+/// vm.value_stack.push(Variable::Int(-1));
 ///
-/// abs(&mut ctx, &mut empty);
+/// abs(&mut vm);
 ///
-/// assert_eq!(ctx.value_stack.pop(), Ok(Variable::Int(1)));
+/// assert_eq!(vm.value_stack.pop(), Ok(Variable::Int(1)));
 ///
 /// ```
-pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
-    if let Ok(v) = ctx.value_stack.at_mut(0) {
+pub fn abs(vm: &mut VM) -> Result<()> {
+    if let Ok(v) = vm.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = v.abs(),
             _ => {}
@@ -614,8 +594,8 @@ pub fn abs(ctx: &mut Context, _buffer: &mut VecDeque<String>) -> Result<()> {
 /// forth `cr` command
 ///
 /// prints `\n` to write
-pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    (ctx.write)(&format!("\n"));
+pub fn cr(vm: &mut VM) -> Result<()> {
+    (vm.write)(&format!("\n"));
     Ok(())
 }
 
@@ -624,8 +604,8 @@ pub fn cr(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// https://forth-standard.org/standard/core/SPACE
 /// 
 /// prints ` ` to write
-pub fn space(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    (ctx.write)(&format!(" "));
+pub fn space(vm: &mut VM) -> Result<()> {
+    (vm.write)(&format!(" "));
     Ok(())
 }
 
@@ -634,8 +614,8 @@ pub fn space(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// https://forth-standard.org/standard/core/OneMinus
 /// 
 /// prints ` ` to write
-pub fn one_minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-     if let Ok(v) = ctx.value_stack.at_mut(0) {
+pub fn one_minus(vm: &mut VM) -> Result<()> {
+     if let Ok(v) = vm.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = *v - 1,
             _ => {}
@@ -650,10 +630,10 @@ pub fn one_minus(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// https://forth-standard.org/standard/core/qDUP
 ///
 ///
-pub fn qdup(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    if let Ok(v) = ctx.value_stack.at(0) {
+pub fn qdup(vm: &mut VM) -> Result<()> {
+    if let Ok(v) = vm.value_stack.at(0) {
         if *v != Variable::Int(0) {
-            ctx.value_stack.push(v.clone());
+            vm.value_stack.push(v.clone());
         }
     }
     Ok(())
@@ -664,9 +644,9 @@ pub fn qdup(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// https://forth-standard.org/standard/core/I
 ///
 ///
-pub fn i(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let idx = ctx.return_stack.at(0)?;
-    ctx.value_stack.push(idx);
+pub fn i(vm: &mut VM) -> Result<()> {
+    let idx = vm.return_stack.at(0)?;
+    vm.value_stack.push(idx);
     Ok(())
 }
 
@@ -676,8 +656,8 @@ pub fn i(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
 /// https://forth-standard.org/standard/core/J
 ///
 ///
-pub fn j(ctx: &mut Context, _: &mut VecDeque<String>) -> Result<()> {
-    let idx = ctx.return_stack.at(1)?;
-    ctx.value_stack.push(idx);
+pub fn j(vm: &mut VM) -> Result<()> {
+    let idx = vm.return_stack.at(1)?;
+    vm.value_stack.push(idx);
     Ok(())
 }
