@@ -33,12 +33,12 @@ pub fn unimplemented(_: &mut VM) -> Result<()> {
 /// # let (test_writer, test_stdout) = channel();
 /// let mut vm = VM::new_null();
 /// # vm.write = Box::new( move |str: &str|  {test_writer.send(str.to_owned());});
-/// 
+///
 /// vm.value_stack.push(23);
-/// 
+///
 /// assert_eq!(dot(&mut vm),Ok(()));
 /// assert_eq!(test_stdout.recv().unwrap(), "23");
-/// 
+///
 /// assert_eq!(dot(&mut vm), Err(Error::Stack));
 ///
 /// ```
@@ -602,7 +602,7 @@ pub fn cr(vm: &mut VM) -> Result<()> {
 /// forth `space` command
 ///
 /// https://forth-standard.org/standard/core/SPACE
-/// 
+///
 /// prints ` ` to write
 pub fn space(vm: &mut VM) -> Result<()> {
     (vm.write)(&format!(" "));
@@ -612,10 +612,10 @@ pub fn space(vm: &mut VM) -> Result<()> {
 /// forth `1-` command
 ///
 /// https://forth-standard.org/standard/core/OneMinus
-/// 
+///
 /// prints ` ` to write
 pub fn one_minus(vm: &mut VM) -> Result<()> {
-     if let Ok(v) = vm.value_stack.at_mut(0) {
+    if let Ok(v) = vm.value_stack.at_mut(0) {
         match v {
             Variable::Int(v) => *v = *v - 1,
             _ => {}
@@ -623,7 +623,6 @@ pub fn one_minus(vm: &mut VM) -> Result<()> {
     }
     Ok(())
 }
-
 
 /// forth `?dup` command
 ///
@@ -650,14 +649,13 @@ pub fn i(vm: &mut VM) -> Result<()> {
     Ok(())
 }
 
-
 /// forth `J` command
 ///
 /// https://forth-standard.org/standard/core/J
 ///
 ///
 pub fn j(vm: &mut VM) -> Result<()> {
-    let idx = vm.return_stack.at(1)?;
+    let idx = vm.return_stack.at(2)?;
     vm.value_stack.push(idx);
     Ok(())
 }

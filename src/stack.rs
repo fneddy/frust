@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{Error, Result, Variable};
 
 // This is just a simple stack
@@ -7,23 +9,23 @@ use crate::{Error, Result, Variable};
 
 #[derive(Debug)]
 pub struct Stack {
-    val: Vec<Variable>,
+    val: VecDeque<Variable>,
 }
 
 impl Stack {
     pub fn new() -> Stack {
-        Stack { val: vec![] }
+        Stack { val: vec![].into() }
     }
     pub fn push<T>(&mut self, value: T)
     where
         T: Into<Variable>,
     {
-        self.val.push(value.into());
+        self.val.push_front(value.into());
     }
 
     pub fn pop(&mut self) -> Result<Variable> {
         if self.val.len() > 0 {
-            return Ok(self.val.pop().unwrap());
+            return Ok(self.val.pop_front().unwrap());
         }
         Err(Error::Stack)
     }
@@ -78,17 +80,21 @@ mod test {
     #[test]
     fn test_stack() {
         let mut stack = Stack::new();
-        let val: Variable = 1.into();
 
-        stack.push(val);
-        {
-            let r = stack.at(0).expect("ref not working");
-            assert_eq!(*r, 1i64.into());
+        for i in 0..10 {
+            let val: Variable = i.into();
+
+            stack.push(val.clone());
+            {
+                let r = stack.at(0).expect("ref not working");
+                assert_eq!(*r, val);
+            }
         }
 
-        let ret = stack.pop().expect("pop not working");
-        assert_eq!(ret, 1i64.into());
-
+        for i in (0..10).rev() {
+            let ret = stack.pop().expect("pop not working");
+            assert_eq!(ret, i.into());
+        }
         let ret = stack.pop();
         assert_eq!(ret, Err(Error::Stack));
     }

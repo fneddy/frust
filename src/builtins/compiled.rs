@@ -20,7 +20,7 @@ use crate::*;
 /// vm.eval(" 1 1 foo ");
 /// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "1");
 /// vm.eval(" 0 foo ");
-/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "no more");
+/// assert_eq!(test_stdout.recv_timeout(Duration::from_millis(400)).unwrap(), "No more");
 
 /// ```
 pub fn compiletime_if(vm: &mut VM) -> Result<Vec<Cell>> {
@@ -90,6 +90,10 @@ pub fn compiletime_if(vm: &mut VM) -> Result<Vec<Cell>> {
 pub fn compiletime_dot_q(vm: &mut VM) -> Result<Vec<Cell>> {
     let mut buffer = String::new();
     while let Some(token) = vm.input_buffer.pop_front() {
+        if token.ends_with("\"") && token.len() > 1 {
+            buffer.push_str(token.trim_end_matches('"'));
+        }
+
         if token.ends_with("\"") {
             let comment = Cell::Data(Variable::from(buffer.as_str()));
             let entry = Cell::Exec(runtime_dot_q);
@@ -127,37 +131,90 @@ pub fn runtime_dot_q(vm: &mut VM) -> Result<()> {
 ///
 /// ```
 pub fn compiletime_do(vm: &mut VM) -> Result<Vec<Cell>> {
-    let mut branches = Vec::new();
+    let mut branch = vec![Cell::Exec(runtime_do)];
+
     let compiled = vm.compile();
-    if let Err(Error::Compiler(branch, token)) = compiled {
-        branches.extend(branch);
+    if let Err(Error::Compiler(routine, token)) = compiled {
         match token.to_lowercase().as_str() {
-            //"loop" => return Ok(Cell::Branch(runtime_loop, branches)),
-            //"+loop" => return Ok(Cell::Branch(runtime_plus_loop, branches)),
-            //"-loop" => return Ok(Cell::Branch(runtime_minus_loop, branches)),
-            _ => return Err(Error::Compiler(branches, token)),
+            "loop" => {
+                let len = routine.len() as i64 + 2;
+                branch.extend(routine);
+                branch.push(Cell::Exec(runtime_loop));
+                branch.push(Cell::Data(Variable::Int(len * -1)));
+                branch.push(Cell::ControlBranchIfNotZero);
+                return Ok(branch);
+            }
+            "+loop" => {
+                let len = routine.len() as i64 + 2;
+                branch.extend(routine);
+                branch.push(Cell::Exec(runtime_plus_loop));
+                branch.push(Cell::Data(Variable::Int(len * -1)));
+                branch.push(Cell::ControlBranchIfNotZero);
+                return Ok(branch);
+            }
+            "-loop" => {
+                let len = routine.len() as i64 + 2;
+                branch.extend(routine);
+                branch.push(Cell::Exec(runtime_minus_loop));
+                branch.push(Cell::Data(Variable::Int(len * -1)));
+                branch.push(Cell::ControlBranchIfNotZero);
+                return Ok(branch);
+            }
+            _ => return Err(Error::Compiler(branch, token)),
         }
     } else {
         return Err(Error::Compiler(compiled?, "EOL".to_owned()));
     };
 }
 
-pub fn runtime_do(_vm: &mut VM) -> Result<()> {
-    println!("runtime_do");
+pub fn runtime_do(vm: &mut VM) -> Result<()> {
+    let index = vm.value_stack.pop()?;
+    let limit = vm.value_stack.pop()?;
+    vm.return_stack.push(limit);
+    vm.return_stack.push(index);
     Ok(())
 }
 
-pub fn runtime_loop(_vm: &mut VM) -> Result<()> {
-    println!("runtime_loop");
+pub fn runtime_loop(vm: &mut VM) -> Result<()> {
+    let i_next = vm.return_stack.pop()? + variable::Variable::Int(1);
+    let limit = vm.return_stack.pop()?;
+
+    if i_next < limit {
+        vm.return_stack.push(limit);
+        vm.return_stack.push(i_next.clone());
+        vm.value_stack.push(1);
+    } else {
+        vm.value_stack.push(0);
+    }
     Ok(())
 }
 
-pub fn runtime_plus_loop(_vm: &mut VM) -> Result<()> {
-    println!("runtime_plus_loop");
+pub fn runtime_plus_loop(vm: &mut VM) -> Result<()> {
+    let offset = vm.value_stack.pop()?;
+    let i_next = vm.return_stack.pop()? + offset;
+    let limit = vm.return_stack.pop()?;
+
+    if i_next < limit {
+        vm.return_stack.push(limit);
+        vm.return_stack.push(i_next.clone());
+        vm.value_stack.push(1);
+    } else {
+        vm.value_stack.push(0);
+    }
     Ok(())
 }
 
-pub fn runtime_minus_loop(_vm: &mut VM) -> Result<()> {
-    println!("runtime_minus_loop");
+pub fn runtime_minus_loop(vm: &mut VM) -> Result<()> {
+    let offset = vm.value_stack.pop()?;
+    let i_next = vm.return_stack.pop()? - offset;
+    let limit = vm.return_stack.pop()?;
+
+    if i_next > limit {
+        vm.return_stack.push(limit);
+        vm.return_stack.push(i_next.clone());
+        vm.value_stack.push(1);
+    } else {
+        vm.value_stack.push(0);
+    }
     Ok(())
 }

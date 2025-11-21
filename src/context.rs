@@ -1,6 +1,8 @@
-use crate::{Cell, Dictionary, Error, Result, Stack, Variable, builtins::dot_s};
+use crate::{Cell, Dictionary, Error, Result, Stack, Variable};
 use std::{
+    any::Any,
     collections::VecDeque,
+    fmt::Debug,
     io::{BufRead, Write},
     mem,
 };
@@ -36,6 +38,19 @@ pub struct VM {
     pub handle_errors: bool,
     pub input_buffer: VecDeque<String>,
 }
+impl Debug for VM {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VM")
+            .field("value_stack", &self.value_stack)
+            .field("return_stack", &self.return_stack)
+            .field("write", &self.write.type_id())
+            .field("read", &self.write.type_id())
+            .field("state", &self.state)
+            .field("handle_errors", &self.handle_errors)
+            .field("input_buffer", &self.input_buffer)
+            .finish()
+    }
+}
 
 impl VM {
     /// Create a new context and bind
@@ -59,7 +74,7 @@ impl VM {
                 stdin.lock().read_line(buf)
             },
             |buf| {
-                print!("{}", buf);
+                print!("{} ", buf);
                 std::io::stdout().flush().unwrap();
             },
         )
@@ -99,7 +114,6 @@ impl VM {
             input_buffer: VecDeque::new(),
         }
     }
-
 
     // actual "compilation" step
     pub fn compile(&mut self) -> Result<Vec<Cell>> {
@@ -155,11 +169,13 @@ impl VM {
     /// executes an entry from the dictionary
     pub fn execute(&mut self, program: Vec<Cell>) -> Result<()> {
         let mut pc = 0i64;
+        //println!("execute: {:?}", self);
         //println!("execute: {:?}", program);
         while pc < program.len() as i64 {
             let word = program.get(pc as usize).ok_or(Error::Executor)?.clone();
+            //println!("pc({})word({:?})",pc,word);
+            //crate::builtins::dot_s(self);
 
-            //println!("pc({})>word({:?})",pc,word);
             let mut next_step = 1i64;
             match word {
                 Cell::Exec(func) => func(self)?,
@@ -190,7 +206,7 @@ impl VM {
                     return Err(Error::Parser("Interpreting a compile-only word".to_owned()));
                 }
             };
-            //dot_s(self);
+            //crate::builtins::dot_s(self);
             pc += next_step;
         }
         Ok(())

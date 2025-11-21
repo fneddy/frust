@@ -1,5 +1,9 @@
-use crate::{VM, Error, Result, Variable};
-use std::{collections::{HashMap}, fmt::{Debug, Display}};
+use crate::{Error, Result, VM, Variable};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    os::raw::c_void,
+};
 
 /// interface for rust `word-functions`
 ///
@@ -82,6 +86,9 @@ impl Dictionary {
     }
 
     pub fn get(&self, name: &str) -> Result<Vec<Cell>> {
-        self.data.get(&name.to_lowercase()).cloned().ok_or(Error::Unimplemented(name.to_owned()))
+        self.data
+            .get(&name.to_lowercase())
+            .cloned()
+            .ok_or(Error::Unimplemented(name.to_owned()))
     }
 }
