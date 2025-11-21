@@ -1,0 +1,14 @@
+: MANY  ?DUP IF . ELSE ." No more " THEN ; 
+: BOTTLES  ." bottle" 1 - IF ." s" THEN ; 
+
+: BEER  CR DUP MANY BOTTLES SPACE ." of beer" ;
+: WALL SPACE ." on the wall" ;
+: DRINK CR ." Take one down and pass it around." ;
+: BUY CR ." Go to the store and buy some more." ;
+
+: ANOTHER ?DUP IF DRINK 1- ELSE BUY 99 THEN ;
+
+: VERSE  DUP BEER WALL DUP BEER ANOTHER BEER WALL CR ;
+: VERSES  0 SWAP DO I VERSE 1 -LOOP ;
+
+99 VERSES
